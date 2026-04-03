@@ -1,8 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   BookOpen,
-  CheckCircle2,
-  ClipboardCheck,
   Clock3,
   Lock as LockIcon,
   RefreshCw,
@@ -10,7 +8,7 @@ import {
   Trophy,
   Users,
 } from "lucide-react";
-import { BrowserRouter, NavLink, Navigate, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { api } from "./api/client";
 import { Progress } from "./components/ui/Progress";
 import "./styles.css";
@@ -170,7 +168,7 @@ function buildProgressFallback(
 function topGridStyle(): React.CSSProperties {
   return {
     display: "grid",
-    gridTemplateColumns: "1.7fr 0.9fr",
+    gridTemplateColumns: "minmax(0, 1fr)",
     gap: 20,
     marginBottom: 24,
     alignItems: "stretch",
@@ -186,14 +184,8 @@ function learnerGridStyle(): React.CSSProperties {
   };
 }
 
-function pageNavButton(active: boolean): React.CSSProperties {
-  return active
-    ? { background: "#0f172a", color: "#ffffff", borderColor: "#0f172a" }
-    : {};
-}
-
 function PageShell({ children }: { children: React.ReactNode }) {
-  return <div className="app-shell" style={{ maxWidth: 1520 }}>{children}</div>;
+  return <div className="app-shell" style={{ maxWidth: 1580 }}>{children}</div>;
 }
 
 function HeaderCard({
@@ -201,27 +193,72 @@ function HeaderCard({
   enrollment,
   onReload,
   onEnroll,
+  completionPercent,
+  openedLessonPercent,
+  completedLessonPercent,
 }: {
   course: OverviewCourse | null;
   enrollment: any;
   onReload: () => void;
   onEnroll: () => void;
+  completionPercent: number;
+  openedLessonPercent: number;
+  completedLessonPercent: number;
 }) {
   return (
     <div className="card">
       <div className="card-header">
+        <div className="badge-row" style={{ marginBottom: 10 }}>
+          <span className="badge primary">Demo LMS nội bộ</span>
+          <span className="badge">Công ty kỹ thuật điện</span>
+          <span className="badge">Learning workspace</span>
+        </div>
         <h1 className="title">{course?.title || "Đào tạo an toàn điện"}</h1>
+        <p className="subtitle" style={{ maxWidth: 860 }}>
+          Theo dõi tiến độ toàn khóa, học lần lượt theo lộ trình và hoàn thành bài test cuối bài để mở khóa nội dung tiếp theo.
+        </p>
       </div>
+
       <div className="card-content">
-        <div className="button-row" style={{ marginBottom: 16 }}>
-          {enrollment && (
-            <span className="badge">
-              {DEMO_USER_ID} • {enrollment.status} • {enrollment.progressPercent}%
-            </span>
-          )}
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "minmax(0, 1.3fr) minmax(320px, 0.7fr)",
+            gap: 18,
+            marginBottom: 18,
+          }}
+        >
+          <div className="list-card" style={{ background: "#f8fafc" }}>
+            <div className="lesson-title" style={{ fontSize: 18, marginBottom: 10 }}>Tổng quan khóa học</div>
+            <div style={{ color: "#475569", lineHeight: 1.7, fontSize: 15 }}>
+              Màn hình này tập trung vào phần học tập: lộ trình bên trái, nội dung bài học ở giữa và các chỉ số tiến độ được đưa vào ngay trong workspace để người học không bị phân tán.
+            </div>
+            <div className="button-row" style={{ marginTop: 16 }}>
+              <button className="button" onClick={onReload}>
+                <RefreshCw size={16} style={{ marginRight: 8, verticalAlign: "text-bottom" }} /> Reload từ API
+              </button>
+              <button className="button primary" onClick={onEnroll}>Ghi danh demo user</button>
+            </div>
+          </div>
+
+          <div className="list-card" style={{ background: "#fff", borderColor: "#dbe3ef" }}>
+            <div className="lesson-title" style={{ fontSize: 18, marginBottom: 10 }}>Trạng thái hiện tại</div>
+            {enrollment ? (
+              <>
+                <div className="badge-row" style={{ marginBottom: 12 }}>
+                  <span className="badge">{DEMO_USER_ID}</span>
+                  <span className="badge">{enrollment.status}</span>
+                  <span className="badge primary">{enrollment.progressPercent}%</span>
+                </div>
+                <Progress value={enrollment.progressPercent ?? completionPercent} />
+              </>
+            ) : (
+              <div style={{ color: "#64748b" }}>Chưa ghi danh user demo.</div>
+            )}
+          </div>
         </div>
 
-        <div className="stat-grid">
+        <div className="stat-grid" style={{ gridTemplateColumns: "repeat(5, minmax(0, 1fr))" }}>
           <div className="stat-card">
             <div className="stat-label">Module</div>
             <div className="stat-value">{course?.moduleCount ?? 0}</div>
@@ -232,22 +269,23 @@ function HeaderCard({
           </div>
           <div className="stat-card">
             <div className="stat-label">Tiến độ toàn khóa</div>
-            <div className="stat-value">{enrollment?.progressPercent ?? 0}%</div>
-            <Progress value={enrollment?.progressPercent ?? 0} className="mt-3" />
+            <div className="stat-value">{enrollment?.progressPercent ?? completionPercent}%</div>
+            <Progress value={enrollment?.progressPercent ?? completionPercent} className="mt-3" />
           </div>
-          <div className="stat-card" style={{ background: "#fff7ed" }}>
-            <div className="stat-label">Kiểm tra cuối khóa học</div>
-            <div className="stat-value">--</div>
-            <div style={{ fontSize: 13, color: "#9a3412" }}>Chỉ hiện khi người học sẵn sàng bắt đầu.</div>
+          <div className="stat-card">
+            <div className="stat-label">Bài đã hoàn thành</div>
+            <div className="stat-value">{completedLessonPercent}%</div>
+            <Progress value={completedLessonPercent} className="mt-3" />
+          </div>
+          <div className="stat-card">
+            <div className="stat-label">Bài đã mở khóa</div>
+            <div className="stat-value">{openedLessonPercent}%</div>
+            <Progress value={openedLessonPercent} className="mt-3" />
           </div>
         </div>
       </div>
     </div>
   );
-}
-
-function RouteSwitcherCard() {
-  return;
 }
 
 function LearnerPage() {
@@ -477,7 +515,15 @@ function LearnerPage() {
   return (
     <PageShell>
       <div style={topGridStyle()}>
-        <HeaderCard course={course} enrollment={enrollment} onReload={() => void loadBaseData()} onEnroll={() => void handleEnroll()} />
+        <HeaderCard
+          course={course}
+          enrollment={enrollment}
+          onReload={() => void loadBaseData()}
+          onEnroll={() => void handleEnroll()}
+          completionPercent={completionPercent}
+          openedLessonPercent={openedLessonPercent}
+          completedLessonPercent={completedLessonPercent}
+        />
       </div>
 
       {error && (
@@ -536,34 +582,17 @@ function LearnerPage() {
         <div className="card">
           <div className="card-header">
             <div style={{ display: "flex", justifyContent: "space-between", gap: 20, flexWrap: "wrap", alignItems: "flex-start" }}>
-              <div>
+              <div style={{ flex: 1, minWidth: 320 }}>
                 <div className="badge-row" style={{ marginBottom: 10 }}>
                   <span className="badge primary">Bài {currentLessonIndex}/{course?.lessonCount ?? lessons.length}</span>
                   {currentModule && <span className="badge">{currentModule.title}</span>}
                   {lessonDetail && <span className="badge">{lessonDetail.lessonType}</span>}
                 </div>
-                <h2 className="title" style={{ fontSize: 30, margin: 0 }}>{lessonDetail?.title || "Chọn bài học"}</h2>
+                <h2 className="title" style={{ fontSize: 32, margin: 0 }}>{lessonDetail?.title || "Chọn bài học"}</h2>
                 <p className="subtitle" style={{ marginTop: 8 }}>
                   {lessonDetail?.objective || "Chọn một bài học đã mở khóa để bắt đầu."}
                 </p>
               </div>
-
-              {lessonDetail && (
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(140px, 1fr))", gap: 12, minWidth: 420 }}>
-                  <div className="stat-card" style={{ padding: 14 }}>
-                    <div className="stat-label">Yêu cầu pass</div>
-                    <div className="lesson-title" style={{ fontSize: 22 }}>{PASS_SCORE}%</div>
-                  </div>
-                  <div className="stat-card" style={{ padding: 14 }}>
-                    <div className="stat-label">Thời gian test</div>
-                    <div className="lesson-title" style={{ fontSize: 22 }}>{formatSeconds(getLessonDurationSeconds(lessonDetail))}</div>
-                  </div>
-                  <div className="stat-card" style={{ padding: 14 }}>
-                    <div className="stat-label">Tiến độ khóa học</div>
-                    <div className="lesson-title" style={{ fontSize: 22 }}>{enrollment?.progressPercent ?? completionPercent}%</div>
-                  </div>
-                </div>
-              )}
             </div>
           </div>
 
@@ -572,7 +601,41 @@ function LearnerPage() {
               <div>Đang tải bài học...</div>
             ) : lessonDetail ? (
               <>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18, marginBottom: 18 }}>
+                <div
+                  className="list-card"
+                  style={{
+                    marginBottom: 18,
+                    padding: 18,
+                    background: "#f8fafc",
+                    borderColor: "#dbe3ef",
+                  }}
+                >
+                  <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1.15fr) minmax(360px, 0.85fr)", gap: 18 }}>
+                    <div>
+                      <div className="lesson-title" style={{ fontSize: 18, marginBottom: 8 }}>Overview bài học</div>
+                      <div style={{ color: "#475569", lineHeight: 1.75, fontSize: 15 }}>
+                        Đây là phần nội dung cốt lõi của bài học hiện tại. Người học nên đọc kỹ nội dung chính, hoàn thành checklist bắt buộc và sau đó mới bắt đầu bài test cuối bài để mở khóa bước tiếp theo.
+                      </div>
+                    </div>
+
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(120px, 1fr))", gap: 12 }}>
+                      <div className="stat-card" style={{ padding: 14 }}>
+                        <div className="stat-label">Yêu cầu pass</div>
+                        <div className="lesson-title" style={{ fontSize: 22 }}>{PASS_SCORE}%</div>
+                      </div>
+                      <div className="stat-card" style={{ padding: 14 }}>
+                        <div className="stat-label">Thời gian test</div>
+                        <div className="lesson-title" style={{ fontSize: 22 }}>{formatSeconds(getLessonDurationSeconds(lessonDetail))}</div>
+                      </div>
+                      <div className="stat-card" style={{ padding: 14 }}>
+                        <div className="stat-label">Tiến độ khóa học</div>
+                        <div className="lesson-title" style={{ fontSize: 22 }}>{enrollment?.progressPercent ?? completionPercent}%</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "1.15fr 0.85fr", gap: 18, marginBottom: 18 }}>
                   <div className="list-card">
                     <div className="lesson-title" style={{ fontSize: 18, marginBottom: 12 }}>Nội dung chính</div>
                     <div style={{ display: "grid", gap: 12 }}>
@@ -770,14 +833,22 @@ function AdminPage() {
   return (
     <PageShell>
       <div style={topGridStyle()}>
-        <HeaderCard course={course} enrollment={null} onReload={() => void loadAdmin()} onEnroll={() => {}} />
-      </div>
-
-      {error && (
-        <div className="card" style={{ marginBottom: 20 }}>
-          <div className="card-content" style={{ color: "#b91c1c" }}>{error}</div>
+        <div className="card">
+          <div className="card-header">
+            <h1 className="title">{course?.title || "Tổng quan quản trị đào tạo"}</h1>
+            <p className="subtitle">Theo dõi các chỉ số vận hành và mức độ hoàn thành đào tạo trên toàn hệ thống.</p>
+          </div>
+          <div className="card-content">
+            {error && <div style={{ color: "#b91c1c", marginBottom: 12 }}>{error}</div>}
+            <div className="admin-stat-grid">
+              <div className="stat-card"><div className="stat-label">Tổng số nhân viên đã học</div><div className="stat-value">{derivedAdminStats.totalLearners}</div></div>
+              <div className="stat-card"><div className="stat-label">Số người pass</div><div className="stat-value">{derivedAdminStats.passedLearners}</div></div>
+              <div className="stat-card"><div className="stat-label">Tỷ lệ pass</div><div className="stat-value">{derivedAdminStats.passRate}%</div></div>
+              <div className="stat-card"><div className="stat-label">Điểm trung bình</div><div className="stat-value">{derivedAdminStats.averageScore}%</div></div>
+            </div>
+          </div>
         </div>
-      )}
+      </div>
 
       <div className="admin-grid">
         <div className="card">
@@ -791,14 +862,7 @@ function AdminPage() {
             </div>
           </div>
           <div className="card-content">
-            <div className="admin-stat-grid">
-              <div className="stat-card"><div className="stat-label">Tổng số nhân viên đã học</div><div className="stat-value">{derivedAdminStats.totalLearners}</div></div>
-              <div className="stat-card"><div className="stat-label">Số người pass</div><div className="stat-value">{derivedAdminStats.passedLearners}</div></div>
-              <div className="stat-card"><div className="stat-label">Tỷ lệ pass</div><div className="stat-value">{derivedAdminStats.passRate}%</div></div>
-              <div className="stat-card"><div className="stat-label">Điểm trung bình</div><div className="stat-value">{derivedAdminStats.averageScore}%</div></div>
-            </div>
-
-            <div className="two-col" style={{ marginTop: 20 }}>
+            <div className="two-col" style={{ marginTop: 0 }}>
               <div className="list-card">
                 <div className="lesson-title" style={{ fontSize: 18, marginBottom: 12 }}>Chỉ số vận hành</div>
                 <div style={{ display: "grid", gap: 10 }}>
@@ -811,9 +875,9 @@ function AdminPage() {
               <div className="list-card warning">
                 <div className="lesson-title" style={{ fontSize: 18, marginBottom: 12 }}>Định hướng giao diện</div>
                 <ul>
-                  <li>Học viên và quản trị đi theo router riêng, tránh trộn workflow.</li>
-                  <li>Màn hình học tập ưu tiên tối đa cho lesson content và quiz.</li>
-                  <li>Tiến độ được đưa vào trong workspace học, không chiếm riêng một cột lớn.</li>
+                  <li>Phần overview được mở rộng để quản lý nhìn nhanh các KPI chính.</li>
+                  <li>Page học viên ưu tiên tối đa cho lesson content và bài test.</li>
+                  <li>Tiến độ học được đưa vào cùng workspace thay vì tách riêng một cột lớn.</li>
                 </ul>
               </div>
             </div>
@@ -834,10 +898,10 @@ function AdminPage() {
             <div className="card-content" style={{ paddingTop: 0 }}>
               <div style={{ display: "grid", gap: 10 }}>
                 {[
-                  "Tách riêng page học viên và page quản trị bằng router.",
-                  "Khung bài học được mở rộng để tập trung vào nội dung học.",
-                  "Phần tiến độ được chuyển vào workspace để hợp lý hơn.",
-                  "Quiz chỉ hiện khi người học bấm bắt đầu làm bài.",
+                  "Overview đầu trang rộng hơn và gom được nhiều ngữ cảnh hơn.",
+                  "Khung nội dung bài học được giữ vai trò trung tâm.",
+                  "Tiến độ được đặt lại trong workspace để hợp ngữ cảnh học tập.",
+                  "Quiz vẫn ẩn mặc định và chỉ hiện khi người học chủ động bắt đầu.",
                 ].map((item) => (
                   <div key={item} className="list-card" style={{ padding: 14 }}>{item}</div>
                 ))}
