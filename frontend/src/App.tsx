@@ -730,7 +730,7 @@ function LearnerPage() {
                             </div>
                           ))}
                         </div>
-
+                        <div style={{ height: 1, background: "#e2e8f0", margin: "18px 0" }}></div>
                         <div className="quiz-actions">
                           <button className="button primary" onClick={() => void handleSubmitQuiz()} disabled={submitting}>
                             {submitting ? "Đang nộp..." : "Nộp bài test"}
