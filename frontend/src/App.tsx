@@ -1,28 +1,30 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  BookOpen,
-  CheckCircle2,
-  Clock3,
-  Lock as LockIcon,
-  RefreshCw,
-  Siren,
-  Users,
-} from "lucide-react";
-import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import React, { useEffect, useMemo, useState } from "react";
 import { api } from "./api/client";
-import { Progress } from "./components/ui/Progress";
 import "./styles.css";
 
 const COURSE_ID = "electrical-safety-foundation";
 const DEMO_USER_ID = "demo_user_001";
-const PASS_SCORE = 75;
-
 const LESSON_QUIZ_OPTIONS = [
   "Tuân thủ đúng quy trình an toàn và thực hiện theo hướng dẫn chuẩn.",
   "Có thể bỏ qua một vài bước nếu đã quen công việc.",
   "Chỉ cần quan sát bằng mắt, không cần kiểm tra lại quy trình.",
   "Ưu tiên làm nhanh trước rồi bổ sung an toàn sau.",
 ];
+
+const STATUS_LABELS: Record<string, string> = {
+  not_started: "Chưa bắt đầu",
+  in_progress: "Đang học",
+  completed: "Hoàn thành",
+  failed: "Chưa đạt",
+};
+
+const LESSON_TYPE_LABELS: Record<string, string> = {
+  theory: "Lý thuyết",
+  practical: "Thực hành",
+  practice: "Thực hành",
+  quiz: "Bài kiểm tra",
+  assessment: "Đánh giá",
+};
 
 type OverviewCourse = {
   id: string;
@@ -80,42 +82,15 @@ type AdminStats = {
   averageScore: number;
 };
 
-type LessonAttempt = {
-  scorePercent: number;
-  correctCount: number;
-  totalQuestions: number;
-  passed: boolean;
-  durationSeconds?: number;
-  submittedAt?: string;
-  results?: Array<{
-    questionId: string;
-    selectedOptionIndex: number;
-    correctAnswerIndex: number;
-    isCorrect: boolean;
-  }>;
-};
+function getStatusLabel(status?: string | null) {
+  if (!status) return "Chưa bắt đầu";
+  return STATUS_LABELS[status] ?? status;
+}
 
-type EnrichedLesson = LessonSummary & {
-  unlocked: boolean;
-  completed: boolean;
-  passed: boolean;
-};
-
-type EnrichedModule = Module & {
-  lessons: EnrichedLesson[];
-  unlocked: boolean;
-  completed: boolean;
-};
-
-type LessonSection = {
-  id: string;
-  navTitle: string;
-  summary: string;
-  details: string[];
-  fieldGuide: string[];
-  warning: string;
-  relatedChecklist: string[];
-};
+function getLessonTypeLabel(type?: string | null) {
+  if (!type) return "Bài học";
+  return LESSON_TYPE_LABELS[type] ?? type;
+}
 
 function formatSeconds(seconds: number) {
   const safe = Math.max(0, seconds);
@@ -134,7 +109,6 @@ function buildLessonQuestions(lesson?: LessonDetail | null) {
     id: `${lesson?.id}-quiz-${index + 1}`,
     question: prompt,
     options: LESSON_QUIZ_OPTIONS,
-    correctAnswerIndex: 0,
   }));
 }
 
@@ -158,8 +132,7 @@ function buildProgressFallback(
       const existing = progressMap.get(lesson.id);
       const completed = existing?.status === "completed" || existing?.passed === true;
       const passed = existing?.passed ?? completed;
-      const unlocked =
-        typeof existing?.unlocked === "boolean" ? existing.unlocked : previousLessonCompleted;
+      const unlocked = typeof existing?.unlocked === "boolean" ? existing.unlocked : previousLessonCompleted;
 
       const normalized: ProgressLesson = {
         lessonId: lesson.id,
@@ -177,225 +150,45 @@ function buildProgressFallback(
     });
 }
 
-function buildDetailedSections(lesson?: LessonDetail | null): LessonSection[] {
-  if (!lesson) return [];
-
-  return (lesson.content ?? []).map((item, index) => {
-    const relatedChecklist = (lesson.checklist ?? []).slice(index, index + 2);
-    const fallbackChecklist =
-      relatedChecklist.length > 0 ? relatedChecklist : (lesson.checklist ?? []).slice(0, 2);
-
-    return {
-      id: `${lesson.id}-section-${index + 1}`,
-      navTitle: `Ý chính ${index + 1}`,
-      summary: item,
-      details: [
-        `${item} Đây là nội dung trọng tâm cần được hiểu theo nghĩa thực hành, không chỉ đọc lướt ở mức ghi nhớ.`,
-        lesson.objective
-          ? `Mục tiêu của phần này là kết nối trực tiếp với mục tiêu bài học: ${lesson.objective}`
-          : "Người học cần biến nội dung này thành hành động kiểm soát rủi ro khi làm việc với thiết bị điện.",
-        `Khi triển khai tại hiện trường, người học cần biết mình phải kiểm tra gì, xác nhận gì và dừng ở điểm nào nếu điều kiện an toàn chưa được đảm bảo.`,
-      ],
-      fieldGuide: [
-        `Đối chiếu nội dung "${item}" với bối cảnh công việc thực tế trước khi thao tác.`,
-        "Xác nhận điều kiện an toàn, tình trạng thiết bị và trách nhiệm của người thực hiện.",
-        "Nếu có điểm chưa rõ, báo lại người phụ trách thay vì tự suy đoán hoặc bỏ qua bước kiểm soát.",
-      ],
-      warning:
-        "Sai lầm thường gặp là hiểu khái niệm đúng nhưng không chuyển nó thành hành vi an toàn cụ thể tại hiện trường.",
-      relatedChecklist: fallbackChecklist,
-    };
-  });
-}
-
-function topGridStyle(): React.CSSProperties {
-  return {
-    display: "grid",
-    gridTemplateColumns: "1fr",
-    gap: 20,
-    marginBottom: 24,
-    alignItems: "stretch",
-  };
-}
-
-function learnerGridStyle(): React.CSSProperties {
-  return {
-    display: "grid",
-    gridTemplateColumns: "320px minmax(0, 1fr)",
-    gap: 24,
-    alignItems: "start",
-  };
-}
-
-function PageShell({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="app-shell" style={{ maxWidth: 1560 }}>
-      {children}
-    </div>
-  );
-}
-
-function HeaderCard({
-  course,
-  enrollment,
-  completionPercent,
-  completedLessons,
-  onReload,
-  onEnroll,
-}: {
-  course: OverviewCourse | null;
-  enrollment: any;
-  completionPercent: number;
-  completedLessons: number;
-  onReload: () => void;
-  onEnroll: () => void;
-}) {
-  return (
-    <div className="card hero-card">
-      <div className="card-header">
-        <div className="hero-layout">
-          <div className="hero-main">
-            <div className="badge-row hero-badges">
-              <span className="badge primary">Đào tạo bắt buộc</span>
-              <span className="badge">An toàn điện</span>
-            </div>
-
-            <div className="button-row hero-actions">
-              <button className="button" onClick={onReload}>
-                <RefreshCw size={16} />
-                Reload dữ liệu
-              </button>
-
-              <button className="button primary" onClick={onEnroll}>
-                Ghi danh học viên demo
-              </button>
-
-              {enrollment && (
-                <span className="badge">
-                  {DEMO_USER_ID} • {enrollment.status} •{" "}
-                  {enrollment.progressPercent}%
-                </span>
-              )}
-            </div>
-          </div>
-
-          <div className="hero-side">
-            <div className="hero-kpi-grid">
-              <div className="hero-kpi-card">
-                <div className="hero-kpi-label">Trạng thái</div>
-                <div className="hero-kpi-value">
-                  {enrollment?.status ?? "not_started"}
-                </div>
-              </div>
-
-              <div className="hero-kpi-card">
-                <div className="hero-kpi-label">Hoàn thành</div>
-                <div className="hero-kpi-value">
-                  {completedLessons}/{course?.lessonCount ?? 0}
-                </div>
-              </div>
-
-              <div className="hero-kpi-card">
-                <div className="hero-kpi-label">Tiến độ</div>
-                <div className="hero-kpi-value">
-                  {enrollment?.progressPercent ?? completionPercent}%
-                </div>
-                <Progress
-                  value={enrollment?.progressPercent ?? completionPercent}
-                  className="mt-3"
-                />
-              </div>
-
-              <div className="hero-kpi-card warm">
-                <div className="hero-kpi-label">Đánh giá cuối bài</div>
-                <div className="hero-kpi-value">--</div>
-                <div className="hero-kpi-note">
-                  Hiển thị khi học viên bắt đầu.
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="card-content">
-        <div className="hero-summary-strip">
-          <div className="hero-summary-item">
-            <div className="hero-summary-label">Module</div>
-            <div className="hero-summary-value">
-              {course?.moduleCount ?? 0}
-            </div>
-          </div>
-
-          <div className="hero-summary-item">
-            <div className="hero-summary-label">Bài học</div>
-            <div className="hero-summary-value">
-              {course?.lessonCount ?? 0}
-            </div>
-          </div>
-
-          <div className="hero-summary-item">
-            <div className="hero-summary-label">Tiến độ toàn khóa</div>
-            <div className="hero-summary-value">
-              {enrollment?.progressPercent ?? completionPercent}%
-            </div>
-          </div>
-
-          <div className="hero-summary-item info">
-            <div className="hero-summary-label">Hướng dẫn</div>
-            <div className="hero-summary-text">
-              Chọn từng ý chính trong mục lục để đọc nội dung chi tiết giống tài
-              liệu đào tạo thực tế.
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function LearnerPage() {
+export default function App() {
+  const [activeTab, setActiveTab] = useState<"hoc-vien" | "quan-tri">("hoc-vien");
   const [course, setCourse] = useState<OverviewCourse | null>(null);
   const [modules, setModules] = useState<Module[]>([]);
   const [lessons, setLessons] = useState<LessonSummary[]>([]);
+  const [resources, setResources] = useState<{ incidents: any[]; rescueSteps: any[] }>({ incidents: [], rescueSteps: [] });
   const [progressLessons, setProgressLessons] = useState<ProgressLesson[]>([]);
+  const [adminStats, setAdminStats] = useState<AdminStats | null>(null);
   const [currentLessonId, setCurrentLessonId] = useState<string | null>(null);
   const [lessonDetail, setLessonDetail] = useState<LessonDetail | null>(null);
   const [quizAnswers, setQuizAnswers] = useState<Record<number, number>>({});
   const [quizTimeLeft, setQuizTimeLeft] = useState<number>(0);
-  const [quizVisible, setQuizVisible] = useState(false);
-  const [latestAttempt, setLatestAttempt] = useState<LessonAttempt | null>(null);
+  const [latestAttempt, setLatestAttempt] = useState<any>(null);
   const [enrollment, setEnrollment] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [loadingLesson, setLoadingLesson] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
-  const [selectedSectionIndex, setSelectedSectionIndex] = useState(0);
 
   const lessonsByModule = useMemo(() => {
-    const lessonMap = new Map<string, EnrichedLesson[]>();
-
+    const lessonMap = new Map<string, (LessonSummary & { unlocked?: boolean; completed?: boolean; passed?: boolean })[]>();
     for (const lesson of lessons) {
       const progress = progressLessons.find((item) => item.lessonId === lesson.id);
-      const entry: EnrichedLesson = {
+      const entry = {
         ...lesson,
         unlocked: progress?.unlocked ?? false,
         completed: progress?.status === "completed",
         passed: progress?.passed ?? false,
       };
-
       if (!lessonMap.has(lesson.moduleId)) lessonMap.set(lesson.moduleId, []);
       lessonMap.get(lesson.moduleId)!.push(entry);
     }
-
     for (const [key, value] of lessonMap.entries()) {
       lessonMap.set(key, [...value].sort((a, b) => a.orderIndex - b.orderIndex));
     }
-
     return lessonMap;
   }, [lessons, progressLessons]);
 
-  const visibleModules = useMemo<EnrichedModule[]>(() => {
+  const visibleModules = useMemo(() => {
     return modules.map((module) => {
       const moduleLessons = lessonsByModule.get(module.id) ?? [];
       const unlocked = moduleLessons.some((lesson) => lesson.unlocked) || moduleLessons.length === 0;
@@ -409,851 +202,527 @@ function LearnerPage() {
   }, [lessons, currentLessonId]);
 
   const currentModule = useMemo(() => {
-    return (
-      visibleModules.find((module) => module.id === currentLessonSummary?.moduleId) ||
-      visibleModules[0] ||
-      null
-    );
+    return visibleModules.find((module) => module.id === currentLessonSummary?.moduleId) || visibleModules[0] || null;
   }, [visibleModules, currentLessonSummary]);
 
   const lessonQuestions = useMemo(() => buildLessonQuestions(lessonDetail), [lessonDetail]);
-  const detailedSections = useMemo(() => buildDetailedSections(lessonDetail), [lessonDetail]);
-  const activeSection = detailedSections[selectedSectionIndex] ?? null;
 
-  const completionPercent = useMemo(() => {
-    if (!course?.lessonCount) return 0;
-    return Math.round(
-      (progressLessons.filter((item) => item.status === "completed").length / course.lessonCount) * 100
-    );
-  }, [course, progressLessons]);
-
-  const currentLessonIndex = useMemo(() => {
-    const flat = visibleModules.flatMap((module) => module.lessons);
-    const idx = flat.findIndex((lesson) => lesson.id === currentLessonId);
-    return idx >= 0 ? idx + 1 : 0;
-  }, [visibleModules, currentLessonId]);
-
-  const openedLessonPercent = useMemo(() => {
-    return Math.round(
-      (progressLessons.filter((item) => item.unlocked).length / Math.max(1, lessons.length)) * 100
-    );
-  }, [progressLessons, lessons.length]);
-
-  const completedLessonPercent = useMemo(() => {
-    return Math.round(
-      (progressLessons.filter((item) => item.status === "completed").length /
-        Math.max(1, lessons.length)) *
-        100
-    );
-  }, [progressLessons, lessons.length]);
-
-  const completedLessonsCount = useMemo(() => {
-    return progressLessons.filter((item) => item.status === "completed").length;
-  }, [progressLessons]);
-
-  const nextLessonInfo = useMemo(() => {
-    const flat = visibleModules.flatMap((module) => module.lessons);
-    const currentIndex = flat.findIndex((lesson) => lesson.id === currentLessonId);
-    const nextLesson = currentIndex >= 0 ? flat[currentIndex + 1] : null;
-    return nextLesson ?? null;
-  }, [visibleModules, currentLessonId]);
-
-  const loadBaseData = useCallback(async () => {
+  async function loadBaseData() {
     setLoading(true);
     setError("");
-
     try {
-      const [overviewPayload, lessonsPayload, progressPayload] = await Promise.all([
+      const [overviewPayload, lessonsPayload, resourcesPayload, progressPayload, adminPayload] = await Promise.all([
         api.getOverview(COURSE_ID),
         api.getLessons(COURSE_ID),
+        api.getResources(COURSE_ID),
         api.getProgress(COURSE_ID, DEMO_USER_ID),
+        api.getAdminStats(COURSE_ID),
       ]);
 
-      const overviewCourse = overviewPayload.data.course;
-      const overviewModules: Module[] = overviewPayload.data.modules ?? [];
-      const lessonList: LessonSummary[] = lessonsPayload.data ?? [];
-      const backendProgressLessons: ProgressLesson[] = progressPayload?.data?.lessons ?? [];
-      const normalizedProgressLessons = buildProgressFallback(
-        overviewModules,
-        lessonList,
-        backendProgressLessons
-      );
+      const courseData = overviewPayload.data.course;
+      const moduleData = overviewPayload.data.modules ?? [];
+      const lessonData = lessonsPayload.data ?? [];
+      const backendProgress = progressPayload?.data?.lessons ?? [];
+      const normalizedProgress = buildProgressFallback(moduleData, lessonData, backendProgress);
 
-      setCourse(overviewCourse);
-      setModules(overviewModules);
-      setLessons(lessonList);
+      setCourse(courseData);
+      setModules(moduleData);
+      setLessons(lessonData);
+      setResources({
+        incidents: resourcesPayload.data.incidents ?? [],
+        rescueSteps: resourcesPayload.data.rescueSteps ?? [],
+      });
       setEnrollment(progressPayload?.data?.enrollment ?? null);
-      setProgressLessons(normalizedProgressLessons);
+      setProgressLessons(normalizedProgress);
+      setAdminStats(adminPayload?.data ?? null);
 
-      const firstUnlockedLesson =
-        normalizedProgressLessons.find((lesson) => lesson.unlocked) ??
-        normalizedProgressLessons[0] ??
-        null;
-
-      if (firstUnlockedLesson) {
-        setCurrentLessonId((prev) => prev ?? firstUnlockedLesson.lessonId);
+      const firstUnlocked = normalizedProgress.find((lesson) => lesson.unlocked) ?? normalizedProgress[0] ?? null;
+      if (firstUnlocked) {
+        setCurrentLessonId((prev) => prev ?? firstUnlocked.lessonId);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load data.");
+      setError(err instanceof Error ? err.message : "Không tải được dữ liệu.");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }
 
-  const loadLesson = useCallback(async (lessonId: string) => {
+  async function loadLesson(lessonId: string) {
     setLoadingLesson(true);
     setError("");
-
     try {
       const [detailPayload, latestAttemptPayload] = await Promise.all([
         api.getLesson(COURSE_ID, lessonId),
         api.getLatestLessonQuizAttempt(COURSE_ID, lessonId, DEMO_USER_ID),
       ]);
-
       setLessonDetail(detailPayload.data);
       setLatestAttempt(latestAttemptPayload?.data?.latestQuizAttempt ?? null);
       setQuizAnswers({});
-      setQuizVisible(false);
       setQuizTimeLeft(getLessonDurationSeconds(detailPayload.data));
-      setSelectedSectionIndex(0);
       setCurrentLessonId(lessonId);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load lesson.");
+      setError(err instanceof Error ? err.message : "Không tải được bài học.");
     } finally {
       setLoadingLesson(false);
     }
-  }, []);
+  }
 
   useEffect(() => {
     void loadBaseData();
-  }, [loadBaseData]);
+  }, []);
 
   useEffect(() => {
     if (!currentLessonId) return;
     void loadLesson(currentLessonId);
-  }, [currentLessonId, loadLesson]);
+  }, [currentLessonId]);
 
   useEffect(() => {
-    if (!lessonDetail || !quizVisible) return;
-    if (latestAttempt?.passed || latestAttempt?.submittedAt) return;
+    if (!lessonDetail) return;
+    if (latestAttempt?.passed) return;
     if (quizTimeLeft <= 0) return;
 
     const timer = window.setInterval(() => {
       setQuizTimeLeft((prev) => Math.max(0, prev - 1));
     }, 1000);
-
     return () => window.clearInterval(timer);
-  }, [lessonDetail, quizVisible, quizTimeLeft, latestAttempt]);
+  }, [lessonDetail, quizTimeLeft, latestAttempt]);
 
   useEffect(() => {
-    if (!quizVisible || quizTimeLeft > 0 || !lessonDetail || latestAttempt?.submittedAt) return;
-    void handleSubmitQuiz();
-  }, [quizVisible, quizTimeLeft, lessonDetail, latestAttempt]);
+    if (!lessonDetail || latestAttempt?.passed) return;
+    if (quizTimeLeft !== 0) return;
+    void handleSubmitQuiz(true);
+  }, [quizTimeLeft]);
 
-  async function handleSubmitQuiz() {
-    if (!lessonDetail || !lessonQuestions.length) return;
-
-    setSubmitting(true);
-    setError("");
-
-    try {
-      const payload = lessonQuestions.map((question, index) => ({
-        questionId: question.id,
-        selectedOptionIndex: Number.isInteger(quizAnswers[index]) ? quizAnswers[index] : -1,
-      }));
-
-      const durationSeconds = getLessonDurationSeconds(lessonDetail) - quizTimeLeft;
-      const response = await api.submitLessonQuiz(
-        COURSE_ID,
-        lessonDetail.id,
-        DEMO_USER_ID,
-        durationSeconds,
-        payload
-      );
-
-      const attempt =
-        response?.data?.attempt ??
-        response?.data?.latestQuizAttempt ??
-        response?.data ??
-        null;
-
-      setLatestAttempt(attempt);
-      setEnrollment(response?.data?.enrollment ?? enrollment);
-      await loadBaseData();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Không thể nộp bài test.");
-    } finally {
-      setSubmitting(false);
-    }
-  }
+  const completionPercent = useMemo(() => {
+    if (!course?.lessonCount) return 0;
+    const completedCount = progressLessons.filter((lesson) => lesson.status === "completed").length;
+    return Math.round((completedCount / course.lessonCount) * 100);
+  }, [progressLessons, course]);
 
   async function handleEnroll() {
-    setError("");
     try {
-      await api.enroll(COURSE_ID, DEMO_USER_ID);
+      const payload = await api.enroll(COURSE_ID, DEMO_USER_ID);
+      setEnrollment(payload.data);
       await loadBaseData();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Không thể ghi danh.");
     }
   }
 
-  function handleSelectModule(module: EnrichedModule) {
-    const firstUnlocked = module.lessons.find((lesson) => lesson.unlocked);
-    if (firstUnlocked) setCurrentLessonId(firstUnlocked.id);
+  async function handleSubmitQuiz(forcedTimeout = false) {
+    if (!lessonDetail || !lessonQuestions.length) return;
+    setSubmitting(true);
+    setError("");
+    try {
+      const answers = lessonQuestions.map((question, index) => ({
+        questionId: question.id,
+        selectedOptionIndex: quizAnswers[index] ?? -1,
+      }));
+      const payload = await api.submitLessonQuiz(
+        COURSE_ID,
+        lessonDetail.id,
+        DEMO_USER_ID,
+        getLessonDurationSeconds(lessonDetail) - quizTimeLeft,
+        answers
+      );
+      setLatestAttempt({
+        ...payload.data.attempt,
+        forcedTimeout,
+      });
+      setEnrollment(payload.data.enrollment);
+      await loadBaseData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Không thể nộp bài kiểm tra.");
+    } finally {
+      setSubmitting(false);
+    }
   }
 
-  function handleSelectLesson(lesson: EnrichedLesson) {
-    if (!lesson.unlocked) return;
-    setCurrentLessonId(lesson.id);
+  function handleRetryQuiz() {
+    if (!lessonDetail) return;
+    setLatestAttempt(null);
+    setQuizAnswers({});
+    setQuizTimeLeft(getLessonDurationSeconds(lessonDetail));
+  }
+
+  function getRecommendation() {
+    if (!currentModule) return "Đề xuất sẽ hiển thị sau khi chọn bài học.";
+    if (currentModule.id === "m1") return "Tiếp theo nên học: Dòng điện tác động lên cơ thể người.";
+    if (currentModule.id === "m2") return "Tiếp theo nên học: Yếu tố làm tăng mức độ nguy hiểm.";
+    if (currentModule.id === "m3") return "Tiếp theo nên học: Điện áp tiếp xúc và điện áp bước.";
+    if (currentModule.id === "m4") return "Tiếp theo nên học: Biện pháp bảo vệ khi làm việc với mạng điện.";
+    return "Tiếp theo nên học: Cấp cứu người bị điện giật.";
   }
 
   if (loading) {
     return (
-      <PageShell>
-        <div className="card">
-          <div className="card-content">Đang tải dữ liệu...</div>
-        </div>
-      </PageShell>
+      <div className="app-shell">
+        <div className="card center-loading">Đang tải dữ liệu từ API...</div>
+      </div>
     );
   }
 
   return (
-    <PageShell>
-      <div style={topGridStyle()}>
-        <HeaderCard
-          course={course}
-          enrollment={enrollment}
-          completionPercent={completionPercent}
-          completedLessons={completedLessonsCount}
-          onReload={() => void loadBaseData()}
-          onEnroll={() => void handleEnroll()}
-        />
+    <div className="app-shell">
+      <div className="top-grid">
+        <div className="card hero-card-compact">
+          <div className="card-content compact-header-content">
+            <div className="badge-row compact-badges">
+              <span className="badge primary">Đào tạo bắt buộc</span>
+              <span className="badge">An toàn điện</span>
+            </div>
+
+            <div className="button-row compact-actions">
+              <button className="button" onClick={() => void loadBaseData()}>Tải lại dữ liệu</button>
+              <button className="button primary" onClick={() => void handleEnroll()}>Ghi danh học viên demo</button>
+              {enrollment && <span className="badge">{DEMO_USER_ID} • {getStatusLabel(enrollment.status)} • {enrollment.progressPercent}%</span>}
+            </div>
+
+            {error && <div className="error-box">{error}</div>}
+
+            <div className="stat-grid compact-stat-grid">
+              <div className="stat-card compact-stat-card">
+                <div className="stat-label">Module</div>
+                <div className="stat-value">{course?.moduleCount ?? modules.length}</div>
+              </div>
+              <div className="stat-card compact-stat-card">
+                <div className="stat-label">Bài học</div>
+                <div className="stat-value">{course?.lessonCount ?? lessons.length}</div>
+              </div>
+              <div className="stat-card compact-stat-card">
+                <div className="stat-label">Tiến độ toàn khóa</div>
+                <div className="stat-value">{enrollment?.progressPercent ?? completionPercent}%</div>
+                <div className="progress-track"><div className="progress-fill" style={{ width: `${enrollment?.progressPercent ?? completionPercent}%` }} /></div>
+              </div>
+              <div className="stat-card compact-stat-card warm-stat">
+                <div className="stat-label">Đánh giá cuối bài</div>
+                <div className="stat-value">--</div>
+                <div className="small-note warm-note">Hiển thị khi học viên bắt đầu.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="card compact-side-card">
+          <div className="card-header">
+            <div className="section-title">Chế độ xem</div>
+            <p className="section-subtitle">Chuyển giữa giao diện học viên và quản trị.</p>
+          </div>
+          <div className="card-content">
+            <div className="tabs">
+              <button className={`tab-button ${activeTab === "hoc-vien" ? "active" : ""}`} onClick={() => setActiveTab("hoc-vien")}>Học viên</button>
+              <button className={`tab-button ${activeTab === "quan-tri" ? "active" : ""}`} onClick={() => setActiveTab("quan-tri")}>Quản trị</button>
+            </div>
+            <div className="muted-box" style={{ marginTop: 16 }}>
+              {activeTab === "hoc-vien"
+                ? "Học theo lộ trình tuần tự. Pass bài kiểm tra để mở khóa nội dung tiếp theo."
+                : "Theo dõi tổng số học viên, số người đạt và tỷ lệ hoàn thành."}
+            </div>
+          </div>
+        </div>
       </div>
 
-      {error && (
-        <div className="card" style={{ marginBottom: 20 }}>
-          <div className="card-content error-text">{error}</div>
-        </div>
-      )}
-
-      <div style={learnerGridStyle()}>
-        <div className="card sticky-sidebar">
-          <div className="card-header">
-            <div className="section-heading">
-              <div className="section-icon">
-                <BookOpen size={18} />
-              </div>
-              <div>
-                <h2 className="section-title">Lộ trình học</h2>
-                <p className="section-subtitle">Học theo lộ trình tuần tự, đọc tài liệu chi tiết và hoàn thành đánh giá cuối bài.</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="card-content" style={{ paddingTop: 0 }}>
-            {visibleModules.map((module) => (
-              <div
-                key={module.id}
-                className={`module-card ${currentModule?.id === module.id ? "active" : ""}`}
-                style={{ marginBottom: 14 }}
-              >
-                <button
-                  onClick={() => handleSelectModule(module)}
-                  disabled={!module.unlocked}
-                  style={{
-                    all: "unset",
-                    cursor: module.unlocked ? "pointer" : "not-allowed",
-                    display: "block",
-                    width: "100%",
-                  }}
-                >
-                  <div className="module-head">
-                    <div>
-                      <div className="lesson-title module-title">{module.title}</div>
-                      <div className="module-meta">
-                        {module.duration ?? "-"} • {module.lessonCount} bài học
-                      </div>
-                    </div>
-
-                    {module.completed ? (
-                      <span className="badge success">Hoàn thành</span>
-                    ) : module.unlocked ? (
-                      <span className="badge">Đang mở</span>
-                    ) : (
-                      <span className="badge warning">
-                        <LockIcon size={12} /> Khóa
-                      </span>
-                    )}
-                  </div>
-                </button>
-
-                <div className="lesson-list">
-                  {module.lessons.map((lesson, index) => (
-                    <button
-                      key={lesson.id}
-                      className={`lesson-button ${currentLessonId === lesson.id ? "active" : ""}`}
-                      disabled={!lesson.unlocked}
-                      onClick={() => handleSelectLesson(lesson)}
-                    >
-                      <div className="lesson-title">
-                        Bài {index + 1}. {lesson.title}
-                      </div>
-                      <div className="lesson-meta">
-                        {lesson.lessonType} •{" "}
-                        {lesson.completed ? "Đã xong" : lesson.unlocked ? "Đang mở" : "Khóa"}
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="card">
-          <div className="card-header">
-            <div className="lesson-heading">
-              <div>
-                <div className="badge-row" style={{ marginBottom: 10 }}>
-                  <span className="badge primary">
-                    Bài {currentLessonIndex}/{course?.lessonCount ?? lessons.length}
-                  </span>
-                  {currentModule && <span className="badge">{currentModule.title}</span>}
-                  {lessonDetail && <span className="badge">{lessonDetail.lessonType}</span>}
-                </div>
-
-                <h2 className="reader-title">{lessonDetail?.title || "Chọn bài học"}</h2>
-
-                <p className="subtitle reader-subtitle">
-                  {lessonDetail?.objective || "Chọn một bài học đã mở khóa để bắt đầu."}
-                </p>
-              </div>
-
-              {lessonDetail && (
-                <div className="lesson-meta-grid">
-                  <div className="stat-card compact">
-                    <div className="stat-label">Yêu cầu pass</div>
-                    <div className="lesson-title stat-mini">{PASS_SCORE}%</div>
-                  </div>
-
-                  <div className="stat-card compact">
-                    <div className="stat-label">Thời gian test</div>
-                    <div className="lesson-title stat-mini">
-                      {formatSeconds(getLessonDurationSeconds(lessonDetail))}
-                    </div>
-                  </div>
-
-                  <div className="stat-card compact">
-                    <div className="stat-label">Tiến độ khóa học</div>
-                    <div className="lesson-title stat-mini">
-                      {enrollment?.progressPercent ?? completionPercent}%
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="card-content">
-            {loadingLesson ? (
-              <div>Đang tải bài học...</div>
-            ) : lessonDetail ? (
-              <>
-                <div className="info-strip">
+      {activeTab === "hoc-vien" ? (
+        <div className="page-grid">
+          <div>
+            <div className="card">
+              <div className="card-header">
+                <div className="section-heading">
+                  <div className="section-icon">1</div>
                   <div>
-                    <div className="lesson-title strip-title">Tổng quan bài học</div>
-                    <div className="strip-text">
-                      Người học có thể đi sâu vào từng ý chính theo dạng reader panel. Hãy chọn một
-                      mục trong cột trái để đọc phần diễn giải chi tiết, hướng dẫn triển khai thực tế
-                      và cảnh báo liên quan.
-                    </div>
-                  </div>
-
-                  <div className="strip-metrics">
-                    <div className="stat-card compact">
-                      <div className="stat-label">Ý chính</div>
-                      <div className="lesson-title stat-mini">{detailedSections.length}</div>
-                    </div>
-
-                    <div className="stat-card compact">
-                      <div className="stat-label">Checklist</div>
-                      <div className="lesson-title stat-mini">{lessonDetail.checklist.length}</div>
-                    </div>
-
-                    <div className="stat-card compact">
-                      <div className="stat-label">Quiz prompt</div>
-                      <div className="lesson-title stat-mini">{lessonDetail.quizPrompts.length}</div>
-                    </div>
+                    <h2 className="section-title">Lộ trình học tuần tự</h2>
+                    <p className="section-subtitle">Bài học được mở khóa theo tiến độ hoàn thành từ backend.</p>
                   </div>
                 </div>
-
-                <div className="reader-shell">
-                  <div className="reader-outline">
-                    <div className="reader-outline-header">
-                      <div className="lesson-title reader-outline-title">Mục lục nội dung</div>
-                      <div className="reader-outline-subtitle">
-                        Chọn từng ý chính để đọc sâu hơn
-                      </div>
-                    </div>
-
-                    <div className="reader-outline-list">
-                      {detailedSections.map((section, index) => {
-                        const active = selectedSectionIndex === index;
-
-                        return (
-                          <button
-                            key={section.id}
-                            type="button"
-                            className={`reader-nav-item ${active ? "active" : ""}`}
-                            onClick={() => setSelectedSectionIndex(index)}
-                          >
-                            <div className="reader-nav-index">0{index + 1}</div>
-
-                            <div className="reader-nav-body">
-                              <div className="reader-nav-title">{section.navTitle}</div>
-                              <div className="reader-nav-summary">{section.summary}</div>
-                            </div>
-
-                            {active && <CheckCircle2 size={16} />}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  <div className="reader-document">
-                    {activeSection ? (
-                      <>
-                        <div className="reader-document-header">
-                          <div className="badge-row" style={{ marginBottom: 10 }}>
-                            <span className="badge primary">{activeSection.navTitle}</span>
-                            <span className="badge">Reader view</span>
-                          </div>
-
-                          <div className="reader-document-title">{activeSection.summary}</div>
-                        </div>
-
-                        <div className="reader-section">
-                          <div className="reader-section-title">1. Giải thích chi tiết</div>
-
-                          <div className="reader-paragraphs">
-                            {activeSection.details.map((detail, index) => (
-                              <p key={`${activeSection.id}-detail-${index}`} className="reader-paragraph">
-                                {detail}
-                              </p>
-                            ))}
-                          </div>
-                        </div>
-
-                        <div className="reader-columns">
-                          <div className="reader-section reader-section-soft">
-                            <div className="reader-section-title">2. Áp dụng tại hiện trường</div>
-                            <ul className="reader-list">
-                              {activeSection.fieldGuide.map((note) => (
-                                <li key={note}>{note}</li>
-                              ))}
-                            </ul>
-                          </div>
-
-                          <div className="reader-callout warning">
-                            <div className="reader-section-title">3. Lưu ý quan trọng</div>
-                            <p className="reader-paragraph">{activeSection.warning}</p>
-                          </div>
-                        </div>
-
-                        <div className="reader-section">
-                          <div className="reader-section-title">4. Checklist liên quan</div>
-                          <ul className="reader-list">
-                            {activeSection.relatedChecklist.map((item) => (
-                              <li key={item}>{item}</li>
-                            ))}
-                          </ul>
-                        </div>
-                      </>
-                    ) : (
-                      <div>Chưa có nội dung chi tiết.</div>
-                    )}
-                  </div>
-                </div>
-
-                <div className="progress-strip">
-                  <div className="lesson-title strip-title">Tiến độ học bài</div>
-
-                  <div className="progress-strip-grid">
-                    <div>
-                      <div className="progress-row">
-                        <span>Tiến độ toàn khóa</span>
-                        <span>{enrollment?.progressPercent ?? completionPercent}%</span>
-                      </div>
-                      <Progress value={enrollment?.progressPercent ?? completionPercent} />
-                    </div>
-
-                    <div>
-                      <div className="progress-row">
-                        <span>Bài đã hoàn thành</span>
-                        <span>{completedLessonPercent}%</span>
-                      </div>
-                      <Progress value={completedLessonPercent} />
-                    </div>
-
-                    <div>
-                      <div className="progress-row">
-                        <span>Bài đã mở khóa</span>
-                        <span>{openedLessonPercent}%</span>
-                      </div>
-                      <Progress value={openedLessonPercent} />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="quiz-box">
-                  {!quizVisible ? (
-                    <div className="quiz-entry">
+              </div>
+              <div className="card-content" style={{ display: "grid", gap: 16 }}>
+                {visibleModules.map((module) => (
+                  <div key={module.id} className={`module-card ${currentModule?.id === module.id ? "active" : ""}`}>
+                    <div className="module-head">
                       <div>
-                        <div className="lesson-title quiz-title">Bài test cuối bài</div>
-                        <div className="module-meta">
-                          Sau khi học xong nội dung, bấm nút bên phải để bắt đầu làm bài test có tính
-                          thời gian.
-                        </div>
-
-                        {latestAttempt && (
-                          <div
-                            style={{ marginTop: 10 }}
-                            className={`badge ${
-                              latestAttempt.passed
-                                ? "success"
-                                : latestAttempt.scorePercent >= PASS_SCORE
-                                ? "success"
-                                : "danger"
-                            }`}
-                          >
-                            Lần gần nhất: {latestAttempt.scorePercent}%{" "}
-                            {latestAttempt.passed ? "• Đạt" : "• Chưa đạt"}
-                          </div>
-                        )}
+                        <div style={{ fontWeight: 700 }}>{module.title}</div>
+                        <div className="module-meta">{module.duration} • {module.level} • {module.lessons.length} bài học</div>
                       </div>
-
-                      <button className="button primary" onClick={() => setQuizVisible(true)}>
-                        Sẵn sàng làm bài test
-                      </button>
+                      <span className={`badge ${module.completed ? "success" : module.unlocked ? "" : "warning"}`}>
+                        {module.completed ? "Đã hoàn thành" : module.unlocked ? "Đang mở" : "Đã khóa"}
+                      </span>
                     </div>
-                  ) : (
-                    <>
-                      <div className="quiz-topbar">
+                    <div className="lesson-list">
+                      {module.lessons.map((lesson, index) => (
+                        <button
+                          key={lesson.id}
+                          className={`lesson-button ${currentLessonId === lesson.id ? "active" : ""}`}
+                          disabled={!lesson.unlocked}
+                          onClick={() => setCurrentLessonId(lesson.id)}
+                        >
+                          <div className="lesson-title">Bài {index + 1}. {lesson.title}</div>
+                          <div className="lesson-meta">
+                            {getLessonTypeLabel(lesson.lessonType)} • {lesson.passed ? "Đã đạt" : lesson.unlocked ? "Đang mở" : "Đã khóa"}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="card" style={{ marginTop: 24 }}>
+              <div className="card-header">
+                <div className="section-heading">
+                  <div className="section-icon">!</div>
+                  <div>
+                    <h2 className="section-title">Tình huống rủi ro</h2>
+                    <p className="section-subtitle">Tình huống thực tế hỗ trợ cho quá trình học.</p>
+                  </div>
+                </div>
+              </div>
+              <div className="card-content" style={{ display: "grid", gap: 12 }}>
+                {resources.incidents.map((incident) => (
+                  <div key={incident.id} className="list-card">
+                    <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+                      <strong>{incident.title}</strong>
+                      <span className={`badge ${incident.severity === "Cao" ? "danger" : ""}`}>{incident.severity}</span>
+                    </div>
+                    <div className="small-note" style={{ marginTop: 6 }}>{incident.status}</div>
+                    <div style={{ marginTop: 8 }}>{incident.lesson}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <div className="card">
+              <div className="card-header">
+                <div className="section-heading">
+                  <div className="section-icon">2</div>
+                  <div>
+                    <h2 className="section-title">{lessonDetail?.title ?? "Chọn bài học"}</h2>
+                    <p className="section-subtitle">{lessonDetail?.objective ?? "Chi tiết bài học sẽ hiển thị sau khi chọn."}</p>
+                  </div>
+                </div>
+              </div>
+              <div className="card-content">
+                {loadingLesson ? (
+                  <div className="muted-box">Đang tải bài học...</div>
+                ) : lessonDetail ? (
+                  <>
+                    <div className="badge-row" style={{ marginBottom: 16 }}>
+                      <span className="badge">{getLessonTypeLabel(lessonDetail.lessonType)}</span>
+                      <span className="badge">{currentModule?.title}</span>
+                      {progressLessons.find((item) => item.lessonId === lessonDetail.id)?.passed && (
+                        <span className="badge success">Đã đạt</span>
+                      )}
+                    </div>
+
+                    <div className="two-col">
+                      <div className="list-card">
+                        <strong>Nội dung bài học</strong>
+                        <ul style={{ marginTop: 10 }}>
+                          {lessonDetail.content.map((item) => <li key={item}>{item}</li>)}
+                        </ul>
+                      </div>
+                      <div className="list-card warning">
+                        <strong>Checklist cần ghi nhớ</strong>
+                        <ul style={{ marginTop: 10 }}>
+                          {lessonDetail.checklist.map((item) => <li key={item}>{item}</li>)}
+                        </ul>
+                      </div>
+                    </div>
+
+                    <div className="quiz-card">
+                      <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", marginBottom: 12 }}>
                         <div>
-                          <div className="lesson-title quiz-title">Bài test cuối bài</div>
-                          <div className="module-meta">
-                            Đạt từ {PASS_SCORE}% để mở khóa bài học tiếp theo.
-                          </div>
+                          <div style={{ fontWeight: 700, fontSize: 18 }}>Bài kiểm tra cuối bài</div>
+                          <div className="small-note">Đạt từ 75% để mở khóa bài tiếp theo.</div>
                         </div>
-
-                        <div className={`badge ${quizTimeLeft <= 30 ? "danger" : "primary"}`}>
-                          <Clock3 size={14} /> {formatSeconds(quizTimeLeft)}
-                        </div>
+                        <span className={`badge ${quizTimeLeft <= 30 ? "danger" : ""}`}>⏱ {formatSeconds(quizTimeLeft)}</span>
                       </div>
 
-                      <div className="quiz-question-list">
-                        {lessonQuestions.map((question, index) => (
-                          <div key={question.id} className="quiz-question-card">
-                            <div className="quiz-question-title">
-                              {index + 1}. {question.question}
-                            </div>
-
-                            <div className="quiz-options">
-                              {question.options.map((option, optionIndex) => {
-                                const selected = quizAnswers[index] === optionIndex;
-                                const locked = submitting || Boolean(latestAttempt?.passed);
-
-                                return (
-                                  <button
-                                    key={option}
-                                    type="button"
-                                    className={`quiz-option ${selected ? "selected" : ""}`}
-                                    onClick={() =>
-                                      setQuizAnswers((prev) => ({
-                                        ...prev,
-                                        [index]: optionIndex,
-                                      }))
-                                    }
-                                    disabled={locked}
-                                  >
-                                    <span className="quiz-option-text">{option}</span>
-                                  </button>
-                                );
-                              })}
-                            </div>
+                      {lessonQuestions.map((question, index) => (
+                        <div key={question.id} className="quiz-question">
+                          <div style={{ fontWeight: 600 }}>{index + 1}. {question.question}</div>
+                          <div className="quiz-options">
+                            {question.options.map((option, optionIndex) => (
+                              <button
+                                key={option}
+                                className={`quiz-option ${quizAnswers[index] === optionIndex ? "selected" : ""}`}
+                                disabled={Boolean(latestAttempt?.passed)}
+                                onClick={() => setQuizAnswers((prev) => ({ ...prev, [index]: optionIndex }))}
+                              >
+                                {option}
+                              </button>
+                            ))}
                           </div>
-                        ))}
-                      </div>
+                        </div>
+                      ))}
 
-                      <div className="quiz-actions">
-                        <button
-                          className="button primary"
-                          onClick={() => void handleSubmitQuiz()}
-                          disabled={submitting}
-                        >
-                          {submitting ? "Đang nộp..." : "Nộp bài test"}
+                      <div className="button-row" style={{ marginTop: 14 }}>
+                        <button className="button primary" disabled={submitting || Boolean(latestAttempt?.passed)} onClick={() => void handleSubmitQuiz(false)}>
+                          {submitting ? "Đang nộp..." : "Nộp bài kiểm tra"}
                         </button>
-
-                        <button
-                          className="button"
-                          onClick={() => {
-                            setQuizAnswers({});
-                            setQuizTimeLeft(getLessonDurationSeconds(lessonDetail));
-                            setLatestAttempt(null);
-                          }}
-                          disabled={submitting}
-                        >
-                          Làm lại
-                        </button>
-
-                        <button
-                          className="button"
-                          onClick={() => setQuizVisible(false)}
-                          disabled={submitting}
-                        >
-                          Ẩn bài test
-                        </button>
+                        <button className="button" onClick={handleRetryQuiz}>Làm lại</button>
+                        <span className="badge">Đã trả lời {Object.keys(quizAnswers).length}/{lessonQuestions.length}</span>
                       </div>
 
                       {latestAttempt && (
-                        <div className={`attempt-panel ${latestAttempt.passed ? "success" : "danger"}`}>
-                          <div className="badge-row" style={{ marginBottom: 10 }}>
-                            <span className={`badge ${latestAttempt.passed ? "success" : "danger"}`}>
-                              {latestAttempt.passed ? "Pass" : "Chưa đạt"}
-                            </span>
-                            <span className="badge">
-                              {latestAttempt.correctCount}/{latestAttempt.totalQuestions} câu đúng
-                            </span>
-                            <span className="badge">Điểm {latestAttempt.scorePercent}%</span>
+                        <div className={`result-panel ${latestAttempt.passed ? "" : "fail"}`} style={{ marginTop: 16 }}>
+                          <div className="badge-row">
+                            <span className="badge primary">Kết quả</span>
+                            <span className={`badge ${latestAttempt.passed ? "success" : "danger"}`}>{latestAttempt.passed ? "Đạt" : "Chưa đạt"}</span>
                           </div>
-
-                          {!latestAttempt.passed && (
-                            <div className="attempt-text danger">
-                              Bạn cần đạt từ {PASS_SCORE}% để mở khóa bài học tiếp theo.
+                          <div className="result-grid">
+                            <div className="result-tile">
+                              <div className="stat-label">Điểm</div>
+                              <div className="stat-value">{latestAttempt.scorePercent}%</div>
                             </div>
-                          )}
-
-                          {latestAttempt.passed && nextLessonInfo && (
-                            <div className="attempt-text success">
-                              Bạn có thể tiếp tục sang bài tiếp theo trong lộ trình.
+                            <div className="result-tile">
+                              <div className="stat-label">Đúng</div>
+                              <div className="stat-value">{latestAttempt.correctCount}/{latestAttempt.totalQuestions}</div>
                             </div>
-                          )}
+                            <div className="result-tile">
+                              <div className="stat-label">Thời gian</div>
+                              <div className="stat-value">{formatSeconds(latestAttempt.durationSeconds ?? 0)}</div>
+                            </div>
+                          </div>
                         </div>
                       )}
-                    </>
-                  )}
-                </div>
-              </>
-            ) : (
-              <div>Chọn một bài học đã mở khóa để bắt đầu.</div>
-            )}
-          </div>
-        </div>
-      </div>
-    </PageShell>
-  );
-}
+                    </div>
 
-function AdminPage() {
-  const [course, setCourse] = useState<OverviewCourse | null>(null);
-  const [modules, setModules] = useState<Module[]>([]);
-  const [lessons, setLessons] = useState<LessonSummary[]>([]);
-  const [adminStats, setAdminStats] = useState<AdminStats | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-
-  const derivedAdminStats = useMemo<AdminStats>(() => {
-    if (adminStats) return adminStats;
-    return {
-      totalLearners: 126,
-      passedLearners: 82,
-      inProgressLearners: 29,
-      passRate: 65,
-      averageScore: 84,
-    };
-  }, [adminStats]);
-
-  const loadAdmin = useCallback(async () => {
-    setLoading(true);
-    setError("");
-
-    try {
-      const [overviewPayload, lessonsPayload, adminPayload] = await Promise.all([
-        api.getOverview(COURSE_ID),
-        api.getLessons(COURSE_ID),
-        api.getAdminStats(COURSE_ID),
-      ]);
-
-      setCourse(overviewPayload.data.course);
-      setModules(overviewPayload.data.modules ?? []);
-      setLessons(lessonsPayload.data ?? []);
-      setAdminStats(adminPayload?.data ?? null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Không tải được dữ liệu quản trị.");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    void loadAdmin();
-  }, [loadAdmin]);
-
-  if (loading) {
-    return (
-      <PageShell>
-        <div className="card">
-          <div className="card-content">Đang tải dữ liệu quản trị...</div>
-        </div>
-      </PageShell>
-    );
-  }
-
-  return (
-    <PageShell>
-      <div style={topGridStyle()}>
-        <div className="card">
-          <div className="card-header">
-            <div className="badge-row" style={{ marginBottom: 12 }}>
-              <span className="badge primary">Bảng điều khiển quản trị</span>
-              <span className="badge">Theo dõi hiệu quả đào tạo</span>
-            </div>
-
-            <h1 className="title">{course?.title || "Quản trị đào tạo an toàn điện"}</h1>
-
-            <p className="subtitle" style={{ marginTop: 12 }}>
-              Màn hình quản trị tập trung vào các chỉ số hoàn thành, tỷ lệ pass và hiệu quả đào tạo
-              theo quy mô toàn khóa học.
-            </p>
-          </div>
-
-          <div className="card-content">
-            <div className="admin-stat-grid">
-              <div className="stat-card">
-                <div className="stat-label">Tổng số nhân viên đã học</div>
-                <div className="stat-value">{derivedAdminStats.totalLearners}</div>
-              </div>
-
-              <div className="stat-card">
-                <div className="stat-label">Số người pass</div>
-                <div className="stat-value">{derivedAdminStats.passedLearners}</div>
-              </div>
-
-              <div className="stat-card">
-                <div className="stat-label">Tỷ lệ pass</div>
-                <div className="stat-value">{derivedAdminStats.passRate}%</div>
-              </div>
-
-              <div className="stat-card">
-                <div className="stat-label">Điểm trung bình</div>
-                <div className="stat-value">{derivedAdminStats.averageScore}%</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {error && (
-        <div className="card" style={{ marginBottom: 20 }}>
-          <div className="card-content error-text">{error}</div>
-        </div>
-      )}
-
-      <div className="admin-grid">
-        <div className="card">
-          <div className="card-header">
-            <div className="section-heading">
-              <div className="section-icon">
-                <Users size={18} />
-              </div>
-              <div>
-                <h2 className="section-title">Tổng quan đào tạo</h2>
-                <p className="section-subtitle">Các chỉ số chính dành cho quản lý</p>
+                    <div className="list-card warning" style={{ marginTop: 20 }}>
+                      <strong>Gợi ý cá nhân hóa</strong>
+                      <div style={{ marginTop: 8 }}>{getRecommendation()}</div>
+                    </div>
+                  </>
+                ) : (
+                  <div className="muted-box">Chọn một bài học đã mở khóa để bắt đầu.</div>
+                )}
               </div>
             </div>
           </div>
 
-          <div className="card-content">
-            <div className="two-col" style={{ marginTop: 4 }}>
-              <div className="list-card">
-                <div className="lesson-title" style={{ fontSize: 18, marginBottom: 12 }}>
-                  Chỉ số vận hành
-                </div>
-
-                <div style={{ display: "grid", gap: 10 }}>
-                  <div className="list-card inner-white">
-                    Đang học: <strong>{derivedAdminStats.inProgressLearners}</strong>
-                  </div>
-                  <div className="list-card inner-white">
-                    Module trong khóa: <strong>{course?.moduleCount ?? modules.length}</strong>
-                  </div>
-                  <div className="list-card inner-white">
-                    Bài học trong khóa: <strong>{course?.lessonCount ?? lessons.length}</strong>
+          <div>
+            <div className="card">
+              <div className="card-header">
+                <div className="section-heading">
+                  <div className="section-icon">3</div>
+                  <div>
+                    <h2 className="section-title">Quy trình cứu nạn nhanh</h2>
+                    <p className="section-subtitle">Cheat sheet hỗ trợ trong quá trình học.</p>
                   </div>
                 </div>
               </div>
-
-              <div className="list-card warning">
-                <div className="lesson-title" style={{ fontSize: 18, marginBottom: 12 }}>
-                  Định hướng giao diện
-                </div>
-
-                <ul>
-                  <li>Học viên và quản trị đi theo router riêng, tránh trộn workflow.</li>
-                  <li>Màn hình học tập ưu tiên tối đa cho lesson content và quiz.</li>
-                  <li>
-                    Phần reader panel giúp người học đào sâu vào từng ý chính thay vì chỉ xem bullet ngắn.
-                  </li>
-                </ul>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div style={{ display: "grid", gap: 24 }}>
-          <div className="card">
-            <div className="card-header">
-              <div className="section-heading">
-                <div className="section-icon">
-                  <Siren size={18} />
-                </div>
-                <div>
-                  <h2 className="section-title">Checklist UI mới</h2>
-                  <p className="section-subtitle">Những điểm đã chỉnh lại</p>
-                </div>
+              <div className="card-content" style={{ display: "grid", gap: 12 }}>
+                {resources.rescueSteps.map((step, index) => (
+                  <div key={step.id} className="timeline-step">
+                    <div className="step-index">{index + 1}</div>
+                    <div>{step.text}</div>
+                  </div>
+                ))}
               </div>
             </div>
 
-            <div className="card-content" style={{ paddingTop: 0 }}>
-              <div style={{ display: "grid", gap: 10 }}>
+            <div className="card" style={{ marginTop: 24 }}>
+              <div className="card-header">
+                <div className="section-heading">
+                  <div className="section-icon">✓</div>
+                  <div>
+                    <h2 className="section-title">Tiến độ cá nhân</h2>
+                    <p className="section-subtitle">Theo dõi kết quả học và trạng thái mở khóa.</p>
+                  </div>
+                </div>
+              </div>
+              <div className="card-content">
                 {[
-                  "Tách riêng page học viên và page quản trị bằng router.",
-                  "Khung bài học được mở rộng để tập trung vào nội dung học.",
-                  "Phần tài liệu chi tiết cho phép bấm từng ý chính để đào sâu hơn.",
-                  "Quiz chỉ hiện khi người học bấm bắt đầu làm bài.",
-                ].map((item) => (
-                  <div key={item} className="list-card inner-white padded-small">
-                    {item}
+                  ["Tiến độ toàn khóa", enrollment?.progressPercent ?? completionPercent],
+                  ["Bài học đã hoàn thành", course?.lessonCount ? Math.round((progressLessons.filter((item) => item.status === "completed").length / course.lessonCount) * 100) : 0],
+                  ["Bài học đã mở khóa", course?.lessonCount ? Math.round((progressLessons.filter((item) => item.unlocked).length / course.lessonCount) * 100) : 0],
+                  ["Tỷ lệ đạt bài kiểm tra", progressLessons.length ? Math.round((progressLessons.filter((item) => item.passed).length / progressLessons.length) * 100) : 0],
+                ].map(([label, value]) => (
+                  <div key={String(label)} className="metric-item">
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 14 }}>
+                      <span>{label}</span>
+                      <span className="small-note">{value}%</span>
+                    </div>
+                    <div className="progress-track"><div className="progress-fill" style={{ width: `${value}%` }} /></div>
                   </div>
                 ))}
               </div>
             </div>
           </div>
         </div>
-      </div>
-    </PageShell>
-  );
-}
+      ) : (
+        <div className="admin-grid">
+          <div className="card">
+            <div className="card-header">
+              <div className="section-heading">
+                <div className="section-icon">A</div>
+                <div>
+                  <h2 className="section-title">Bảng điều khiển quản trị</h2>
+                  <p className="section-subtitle">Theo dõi tổng số học viên, số người đạt và tỷ lệ hoàn thành.</p>
+                </div>
+              </div>
+            </div>
+            <div className="card-content">
+              <div className="admin-stat-grid">
+                <div className="stat-card"><div className="stat-label">Tổng số nhân viên đã học</div><div className="stat-value">{adminStats?.totalLearners ?? 0}</div></div>
+                <div className="stat-card"><div className="stat-label">Số người đạt</div><div className="stat-value">{adminStats?.passedLearners ?? 0}</div></div>
+                <div className="stat-card"><div className="stat-label">Tỷ lệ đạt</div><div className="stat-value">{adminStats?.passRate ?? 0}%</div></div>
+                <div className="stat-card"><div className="stat-label">Điểm trung bình</div><div className="stat-value">{adminStats?.averageScore ?? 0}%</div></div>
+              </div>
 
-export default function App() {
-  return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<Navigate to="/learner" replace />} />
-        <Route path="/learner" element={<LearnerPage />} />
-        <Route path="/admin" element={<AdminPage />} />
-      </Routes>
-    </BrowserRouter>
+              <div className="two-col" style={{ marginTop: 18 }}>
+                <div className="list-card">
+                  <strong>Chỉ số vận hành</strong>
+                  <div style={{ display: "grid", gap: 10, marginTop: 14 }}>
+                    <div className="timeline-step"><div className="step-index">1</div><div>Đang học: <strong>{adminStats?.inProgressLearners ?? 0}</strong></div></div>
+                    <div className="timeline-step"><div className="step-index">2</div><div>Module trong khóa: <strong>{course?.moduleCount ?? modules.length}</strong></div></div>
+                    <div className="timeline-step"><div className="step-index">3</div><div>Bài học trong khóa: <strong>{course?.lessonCount ?? lessons.length}</strong></div></div>
+                    <div className="timeline-step"><div className="step-index">4</div><div>Demo user hoàn thành khóa: <strong>{enrollment?.status === "completed" ? "Đạt" : "Chưa đạt"}</strong></div></div>
+                  </div>
+                </div>
+                <div className="list-card warning">
+                  <strong>Nhận định dashboard</strong>
+                  <ul style={{ marginTop: 10 }}>
+                    <li>Luồng học tuần tự giúp giảm việc bỏ sót bài học nền tảng.</li>
+                    <li>Bài kiểm tra cuối mỗi bài tạo checkpoint đánh giá rõ ràng.</li>
+                    <li>Dashboard quản lý tập trung vào tổng số người học, số người đạt và tỷ lệ hoàn thành.</li>
+                    <li>Backend đang tính các chỉ số này từ enrollments và lesson quiz attempts.</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <div className="card">
+              <div className="card-header">
+                <div className="section-heading">
+                  <div className="section-icon">i</div>
+                  <div>
+                    <h2 className="section-title">Checklist luồng mới</h2>
+                    <p className="section-subtitle">Các thay đổi nghiệp vụ đã được áp dụng.</p>
+                  </div>
+                </div>
+              </div>
+              <div className="card-content" style={{ display: "grid", gap: 12 }}>
+                {[
+                  "Học viên phải đi theo thứ tự từng bài học.",
+                  "Cuối mỗi bài có bài kiểm tra tính thời gian và nộp riêng.",
+                  "Chỉ khi đạt bài kiểm tra mới được mở khóa bài tiếp theo.",
+                  "Dashboard quản lý hiển thị tổng học viên, số người đạt và tỷ lệ hoàn thành.",
+                ].map((item, index) => (
+                  <div key={item} className="timeline-step">
+                    <div className="step-index">{index + 1}</div>
+                    <div>{item}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
