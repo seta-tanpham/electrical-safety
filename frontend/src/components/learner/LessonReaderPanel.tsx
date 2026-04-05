@@ -27,12 +27,14 @@ export default function LessonReaderPanel({
   const isCompleted = completedSectionIds.includes(activeSection.id);
 
   return (
-    <section className="section-card reader-card">
-      <div className="reader-layout-v2">
-        <aside className="reader-outline-v2">
+    <section className="section-card reader-card reader-card-polished">
+      <div className="reader-layout-v2 reader-layout-polished">
+        <aside className="reader-outline-v2 reader-outline-polished">
           <div className="reader-pane-header">
-            <h3 className="section-title">Mục lục nội dung</h3>
-            <p className="section-subtitle">Chỉ hiển thị một phần tại một thời điểm để dễ tập trung</p>
+            <div>
+              <h3 className="section-title">Mục lục bài học</h3>
+              <p className="section-subtitle">Mỗi lần chỉ tập trung một phần để học sâu hơn</p>
+            </div>
           </div>
 
           <div className="reader-outline-list-v2">
@@ -45,7 +47,7 @@ export default function LessonReaderPanel({
                   className={`reader-outline-item-v2 ${selectedSectionIndex === index ? "active" : ""}`}
                   onClick={() => onSelectSection(index)}
                 >
-                  <div className="reader-outline-index-v2">{index + 1}</div>
+                  <div className="reader-outline-index-v2">{String(index + 1).padStart(2, "0")}</div>
                   <div className="reader-outline-content-v2">
                     <div className="reader-outline-title-v2">{section.title}</div>
                     <div className="reader-outline-summary-v2">{section.summary}</div>
@@ -57,10 +59,12 @@ export default function LessonReaderPanel({
           </div>
         </aside>
 
-        <div className="reader-document-v2">
-          <div className="reader-toolbar sticky-toolbar">
+        <div className="reader-document-v2 reader-document-polished">
+          <div className="reader-toolbar sticky-toolbar reader-toolbar-polished">
             <div>
-              <div className="reader-toolbar-kicker">Phần {selectedSectionIndex + 1}/{sectionCount}</div>
+              <div className="reader-toolbar-kicker">
+                Phần {selectedSectionIndex + 1}/{sectionCount}
+              </div>
               <div className="reader-toolbar-title">{activeSection.title}</div>
             </div>
 
@@ -91,7 +95,7 @@ export default function LessonReaderPanel({
             </div>
           </div>
 
-          <div className="reader-document-body">
+          <div className="reader-document-body reader-document-body-polished">
             <div className="reader-document-title-v2">{activeSection.summary}</div>
 
             <div className="reader-section-block-v2">
@@ -103,20 +107,22 @@ export default function LessonReaderPanel({
               </div>
             </div>
 
-            {activeSection.examples && activeSection.examples.length > 0 && (
+            {(activeSection.examples?.length ?? 0) > 0 && (
               <div className="reader-section-grid-v2">
-                <div className="reader-surface-box">
+                <div className="reader-surface-box polished-surface-box">
                   <div className="reader-section-title-v2">Ví dụ thực tế</div>
                   <ul className="reader-list-v2">
-                    {activeSection.examples.map((item) => (
+                    {(activeSection.examples ?? []).map((item) => (
                       <li key={item}>{item}</li>
                     ))}
                   </ul>
                 </div>
 
-                <div className="reader-surface-box warning">
+                <div className="reader-surface-box warning polished-surface-box">
                   <div className="reader-section-title-v2">Cảnh báo</div>
-                  <p className="reader-warning-text">{activeSection.warning ?? "Không có cảnh báo bổ sung."}</p>
+                  <p className="reader-warning-text">
+                    {activeSection.warning ?? "Không có cảnh báo bổ sung."}
+                  </p>
                 </div>
               </div>
             )}

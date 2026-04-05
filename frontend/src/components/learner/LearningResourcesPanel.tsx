@@ -6,7 +6,6 @@ import {
   Film,
   Image as ImageIcon,
   Link as LinkIcon,
-  CheckCircle2,
 } from "lucide-react";
 import type { LessonResource, NormalizedLessonDetail } from "../../features/training/types";
 
@@ -61,12 +60,14 @@ export default function LearningResourcesPanel({
   }
 
   return (
-    <section className="section-card resources-card">
-      <div className="resources-layout">
-        <aside className="resources-list-pane">
+    <section className="section-card resources-card resources-card-polished">
+      <div className="resources-layout resources-layout-polished">
+        <aside className="resources-list-pane resources-list-pane-polished">
           <div className="reader-pane-header">
-            <h3 className="section-title">Học liệu liên quan</h3>
-            <p className="section-subtitle">Video, PDF, SOP, biểu mẫu và tài liệu tham khảo</p>
+            <div>
+              <h3 className="section-title">Học liệu liên quan</h3>
+              <p className="section-subtitle">Video, PDF, SOP, biểu mẫu và tài liệu tham khảo</p>
+            </div>
           </div>
 
           <div className="resource-list-v2">
@@ -85,9 +86,7 @@ export default function LearningResourcesPanel({
                   </div>
 
                   <div className="resource-card-title-v2">{resource.title}</div>
-                  {resource.description && (
-                    <div className="resource-card-desc-v2">{resource.description}</div>
-                  )}
+                  {resource.description && <div className="resource-card-desc-v2">{resource.description}</div>}
 
                   <div className="resource-card-footer-v2">
                     {resource.isRequired && <span className="status-chip locked">Bắt buộc</span>}
@@ -101,10 +100,10 @@ export default function LearningResourcesPanel({
           </div>
         </aside>
 
-        <div className="resource-viewer-v2">
+        <div className="resource-viewer-v2 resource-viewer-polished">
           {activeResource ? (
             <>
-              <div className="resource-viewer-head-v2 sticky-toolbar">
+              <div className="resource-viewer-head-v2 sticky-toolbar resource-viewer-head-polished">
                 <div>
                   <div className="reader-toolbar-kicker">{RESOURCE_TYPE_LABELS[activeResource.type]}</div>
                   <div className="reader-toolbar-title">{activeResource.title}</div>
@@ -122,13 +121,13 @@ export default function LearningResourcesPanel({
                 </button>
               </div>
 
-              <div className="resource-viewer-body-v2">
-                <div className="resource-preview-box-v2">
+              <div className="resource-viewer-body-v2 resource-viewer-body-polished">
+                <div className="resource-preview-box-v2 polished-preview-box">
                   {getResourceIcon(activeResource.type)}
                   <div className="resource-preview-title-v2">Khu vực xem học liệu</div>
                   <div className="resource-preview-note-v2">
                     {activeResource.type === "video" &&
-                      "Có thể nhúng player video, lưu thời điểm xem dở và tính % hoàn thành."}
+                      "Có thể nhúng player video, lưu thời điểm xem dở và tính tỷ lệ hoàn thành."}
                     {activeResource.type === "pdf" &&
                       "Có thể xem nhanh PDF/SOP, mở toàn màn hình hoặc tải về."}
                     {activeResource.type === "image" &&
@@ -140,16 +139,21 @@ export default function LearningResourcesPanel({
                   </div>
                 </div>
 
+                <div className="resource-meta-panel">
+                  <div className="resource-meta-item">
+                    <span>Loại học liệu</span>
+                    <strong>{RESOURCE_TYPE_LABELS[activeResource.type]}</strong>
+                  </div>
+                  <div className="resource-meta-item">
+                    <span>Mức độ bắt buộc</span>
+                    <strong>{activeResource.isRequired ? "Bắt buộc" : "Tham khảo"}</strong>
+                  </div>
+                </div>
+
                 <div className="resource-actions-grid-v2">
-                  <button className="btn btn-secondary" type="button">
-                    Xem nhanh
-                  </button>
-                  <button className="btn btn-secondary" type="button">
-                    Mở toàn màn hình
-                  </button>
-                  <button className="btn btn-secondary" type="button">
-                    Tải xuống / Mở liên kết
-                  </button>
+                  <button className="btn btn-secondary" type="button">Xem nhanh</button>
+                  <button className="btn btn-secondary" type="button">Mở toàn màn hình</button>
+                  <button className="btn btn-secondary" type="button">Tải xuống / Mở liên kết</button>
                 </div>
               </div>
             </>

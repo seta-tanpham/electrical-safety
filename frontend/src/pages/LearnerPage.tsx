@@ -226,15 +226,6 @@ export default function LearnerPage() {
     saveCompletionState(currentLessonId, { completedSectionIds, completedResourceIds });
   }, [currentLessonId, completedSectionIds, completedResourceIds]);
 
-  async function handleEnroll() {
-    try {
-      const payload = await api.enroll(COURSE_ID, DEMO_USER_ID);
-      setEnrollment(payload.data);
-      await loadBaseData();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Không thể ghi danh.");
-    }
-  }
 
   async function handleQuizSubmit(
     durationSeconds: number,
@@ -253,7 +244,21 @@ export default function LearnerPage() {
         answers
       );
 
-      setLatestAttempt(payload.data.attempt ?? null);
+      const fallbackResults = answers.map((answer) => ({
+        questionId: answer.questionId,
+        selectedOptionIndex: answer.selectedOptionIndex,
+        correctAnswerIndex: 0,
+        isCorrect: answer.selectedOptionIndex === 0,
+      }));
+
+      const attempt = payload.data.attempt
+        ? {
+            ...payload.data.attempt,
+            results: payload.data.attempt.results ?? fallbackResults,
+          }
+        : null;
+
+      setLatestAttempt(attempt);
       setEnrollment(payload.data.enrollment);
       await loadBaseData();
     } catch (err) {
@@ -289,9 +294,6 @@ export default function LearnerPage() {
         enrollment={enrollment}
         completionPercent={completionPercent}
         completedLessons={completedLessonsCount}
-        onReload={() => void loadBaseData()}
-        onEnroll={() => void handleEnroll()}
-        demoUserId={DEMO_USER_ID}
       />
 
       {error && <div className="error-box">{error}</div>}

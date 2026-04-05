@@ -89,6 +89,12 @@ export type LessonAttempt = {
   passed: boolean;
   durationSeconds?: number;
   submittedAt?: string;
+  results?: Array<{
+    questionId: string;
+    selectedOptionIndex: number;
+    correctAnswerIndex: number;
+    isCorrect: boolean;
+  }>;
 };
 
 export type EnrichedLesson = LessonSummary & {

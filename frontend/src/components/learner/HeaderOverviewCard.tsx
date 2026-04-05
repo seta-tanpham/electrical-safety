@@ -1,5 +1,4 @@
 import React from "react";
-import { RefreshCw } from "lucide-react";
 import { Progress } from "../ui/Progress";
 import { getStatusLabel } from "../../features/training/helpers";
 import type { OverviewCourse } from "../../features/training/types";
@@ -9,9 +8,6 @@ type Props = {
   enrollment: any;
   completionPercent: number;
   completedLessons: number;
-  onReload: () => void;
-  onEnroll: () => void;
-  demoUserId: string;
 };
 
 export default function HeaderOverviewCard({
@@ -19,86 +15,70 @@ export default function HeaderOverviewCard({
   enrollment,
   completionPercent,
   completedLessons,
-  onReload,
-  onEnroll,
-  demoUserId,
 }: Props) {
   return (
-    <section className="section-card header-card">
-      <div className="header-top">
-        <div className="header-left">
-          <div className="pill-row">
+    <section className="section-card header-card header-card-compact header-card-polished">
+      <div className="header-top header-top-compact header-top-polished">
+        <div className="header-left header-left-compact header-left-polished">
+          <div className="pill-row compact-gap">
             <span className="pill pill-primary">Đào tạo bắt buộc</span>
             <span className="pill">An toàn điện</span>
           </div>
 
-          <div className="action-row">
-            <button className="btn btn-secondary" onClick={onReload}>
-              <RefreshCw size={16} />
-              Tải lại dữ liệu
-            </button>
-
-            <button className="btn btn-primary" onClick={onEnroll}>
-              Ghi danh học viên demo
-            </button>
-
-            {enrollment && (
-              <span className="pill">
-                {demoUserId} • {getStatusLabel(enrollment.status)} • {enrollment.progressPercent}%
-              </span>
-            )}
+          <div className="header-intro-copy header-intro-copy-polished">
+            Theo dõi trạng thái học tập, mức độ hoàn thành và điều kiện làm bài kiểm tra ngay trên cùng một màn hình.
           </div>
         </div>
 
         <div className="header-right">
-          <div className="kpi-grid">
-            <div className="kpi-card">
+          <div className="kpi-grid compact-kpi-grid kpi-grid-polished">
+            <div className="kpi-card compact-card">
               <div className="kpi-label">Trạng thái</div>
               <div className="kpi-value">{getStatusLabel(enrollment?.status)}</div>
             </div>
 
-            <div className="kpi-card">
+            <div className="kpi-card compact-card">
               <div className="kpi-label">Hoàn thành</div>
               <div className="kpi-value">
                 {completedLessons}/{course?.lessonCount ?? 0}
               </div>
             </div>
 
-            <div className="kpi-card">
+            <div className="kpi-card compact-card">
               <div className="kpi-label">Tiến độ</div>
               <div className="kpi-value">{enrollment?.progressPercent ?? completionPercent}%</div>
               <Progress value={enrollment?.progressPercent ?? completionPercent} />
             </div>
 
-            <div className="kpi-card kpi-warm">
+            <div className="kpi-card kpi-warm compact-card">
               <div className="kpi-label">Đánh giá cuối bài</div>
               <div className="kpi-value">--</div>
-              <div className="kpi-note">Hiển thị khi học viên bắt đầu.</div>
+              <div className="kpi-note">Mở khi hoàn thành nội dung và học liệu bắt buộc.</div>
             </div>
           </div>
         </div>
       </div>
 
-      <div className="summary-grid">
-        <div className="summary-card">
+      <div className="summary-grid compact-summary-grid summary-grid-polished">
+        <div className="summary-card compact-summary-card">
           <div className="summary-label">Module</div>
           <div className="summary-value">{course?.moduleCount ?? 0}</div>
         </div>
 
-        <div className="summary-card">
+        <div className="summary-card compact-summary-card">
           <div className="summary-label">Bài học</div>
           <div className="summary-value">{course?.lessonCount ?? 0}</div>
         </div>
 
-        <div className="summary-card">
+        <div className="summary-card compact-summary-card">
           <div className="summary-label">Tiến độ toàn khóa</div>
           <div className="summary-value">{enrollment?.progressPercent ?? completionPercent}%</div>
         </div>
 
-        <div className="summary-card summary-info">
-          <div className="summary-label">Hướng dẫn</div>
+        <div className="summary-card summary-info compact-summary-card">
+          <div className="summary-label">Cách học</div>
           <div className="summary-text">
-            Chọn từng ý chính trong mục lục để đọc nội dung chi tiết và mở học liệu liên quan.
+            Chọn từng ý chính để đọc sâu hơn, sau đó mở học liệu liên quan trước khi bắt đầu bài kiểm tra.
           </div>
         </div>
       </div>
