@@ -46,14 +46,6 @@ export type ProgressLesson = {
   passed?: boolean;
 };
 
-export type AdminStats = {
-  totalLearners: number;
-  passedLearners: number;
-  inProgressLearners: number;
-  passRate: number;
-  averageScore: number;
-};
-
 export type LessonAttempt = {
   scorePercent: number;
   correctCount: number;
@@ -61,6 +53,7 @@ export type LessonAttempt = {
   passed: boolean;
   durationSeconds?: number;
   submittedAt?: string;
+  forcedTimeout?: boolean;
   results?: Array<{
     questionId: string;
     selectedOptionIndex: number;
@@ -89,11 +82,4 @@ export type LessonSection = {
   fieldGuide: string[];
   warning: string;
   relatedChecklist: string[];
-};
-
-export type LessonQuestion = {
-  id: string;
-  question: string;
-  options: string[];
-  correctAnswerIndex: number;
 };

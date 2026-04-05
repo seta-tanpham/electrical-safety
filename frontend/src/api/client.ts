@@ -1,4 +1,5 @@
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/$/, "") || "/api";
+const API_BASE_URL =
+  (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/$/, "") || "/api";
 
 async function fetchJson(path: string, options: RequestInit = {}) {
   const response = await fetch(`${API_BASE_URL}${path}`, {
@@ -26,11 +27,10 @@ async function fetchOptionalJson(path: string) {
 }
 
 export const api = {
-  getHealth: () => fetchJson("/../health"),
   getOverview: (courseId: string) => fetchJson(`/courses/${courseId}/overview`),
   getLessons: (courseId: string) => fetchJson(`/courses/${courseId}/lessons`),
-  getLesson: (courseId: string, lessonId: string) => fetchJson(`/courses/${courseId}/lessons/${lessonId}?includeBlocks=true`),
-  getResources: (courseId: string) => fetchJson(`/courses/${courseId}/resources`),
+  getLesson: (courseId: string, lessonId: string) =>
+    fetchJson(`/courses/${courseId}/lessons/${lessonId}?includeBlocks=true`),
   enroll: (courseId: string, userId: string) =>
     fetchJson(`/courses/${courseId}/enrollments`, {
       method: "POST",
@@ -51,5 +51,4 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ userId, durationSeconds, answers }),
     }),
-  getAdminStats: (courseId: string) => fetchOptionalJson(`/courses/${courseId}/admin-stats`),
 };

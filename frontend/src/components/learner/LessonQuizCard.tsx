@@ -1,11 +1,13 @@
 import React, { useEffect, useMemo } from "react";
-import { Clock3 } from "lucide-react";
+import { api } from "../../api/client";
 import {
   buildLessonQuestions,
+  COURSE_ID,
+  DEMO_USER_ID,
   formatSeconds,
   getLessonDurationSeconds,
 } from "../../features/training/helpers";
-import { LessonDetail, LessonAttempt } from "../../features/training/types";
+import type { LessonAttempt, LessonDetail } from "../../features/training/types";
 
 type Props = {
   lessonDetail: LessonDetail | null;
@@ -17,9 +19,9 @@ type Props = {
   quizTimeLeft: number;
   setQuizTimeLeft: React.Dispatch<React.SetStateAction<number>>;
   submitting: boolean;
-  setSubmitting: React.Dispatch<React.SetStateAction<boolean>>;
+  setSubmitting: (value: boolean) => void;
   passScore: number;
-  onSubmit: (payload: { questionId: string; selectedOptionIndex: number }[], durationSeconds: number) => Promise<void>;
+  onSubmitted: () => Promise<void>;
 };
 
 export default function LessonQuizCard({
@@ -34,17 +36,12 @@ export default function LessonQuizCard({
   submitting,
   setSubmitting,
   passScore,
-  onSubmit,
+  onSubmitted,
 }: Props) {
-  const questions = useMemo(() => buildLessonQuestions(lessonDetail), [lessonDetail]);
+  const lessonQuestions = useMemo(() => buildLessonQuestions(lessonDetail), [lessonDetail]);
 
   useEffect(() => {
-    if (!lessonDetail) return;
-    setQuizTimeLeft(getLessonDurationSeconds(lessonDetail));
-  }, [lessonDetail, setQuizTimeLeft]);
-
-  useEffect(() => {
-    if (!quizVisible || !lessonDetail) return;
+    if (!lessonDetail || !quizVisible) return;
     if (latestAttempt?.passed || latestAttempt?.submittedAt) return;
     if (quizTimeLeft <= 0) return;
 
@@ -55,38 +52,54 @@ export default function LessonQuizCard({
     return () => window.clearInterval(timer);
   }, [lessonDetail, quizVisible, quizTimeLeft, latestAttempt, setQuizTimeLeft]);
 
-  async function handleSubmit() {
-    if (!lessonDetail || !questions.length) return;
+  useEffect(() => {
+    if (!quizVisible || quizTimeLeft > 0 || !lessonDetail || latestAttempt?.submittedAt) return;
+    void handleSubmitQuiz(true);
+  }, [quizVisible, quizTimeLeft, lessonDetail, latestAttempt]);
 
+  async function handleSubmitQuiz(forcedTimeout = false) {
+    if (!lessonDetail || !lessonQuestions.length) return;
     setSubmitting(true);
 
     try {
-      const payload = questions.map((question, index) => ({
+      const answers = lessonQuestions.map((question, index) => ({
         questionId: question.id,
-        selectedOptionIndex: Number.isInteger(quizAnswers[index]) ? quizAnswers[index] : -1,
+        selectedOptionIndex: quizAnswers[index] ?? -1,
       }));
 
-      const durationSeconds = getLessonDurationSeconds(lessonDetail) - quizTimeLeft;
-      await onSubmit(payload, durationSeconds);
+      await api.submitLessonQuiz(
+        COURSE_ID,
+        lessonDetail.id,
+        DEMO_USER_ID,
+        getLessonDurationSeconds(lessonDetail) - quizTimeLeft,
+        answers
+      );
+
+      await onSubmitted();
     } finally {
       setSubmitting(false);
     }
   }
 
+  function handleRetryQuiz() {
+    if (!lessonDetail) return;
+    setQuizAnswers({});
+    setQuizTimeLeft(getLessonDurationSeconds(lessonDetail));
+  }
+
   if (!lessonDetail) return null;
 
   return (
-    <section className="section-card quiz-card">
+    <section className="section-card">
       {!quizVisible ? (
         <div className="quiz-entry">
           <div>
-            <div className="section-title">Bài kiểm tra cuối bài</div>
-            <p className="section-subtitle">
-              Sau khi học xong nội dung, bấm nút bên phải để bắt đầu làm bài kiểm tra có tính thời gian.
-            </p>
-
+            <div className="quiz-card-title">Bài kiểm tra cuối bài</div>
+            <div className="quiz-card-subtitle">
+              Sau khi học xong nội dung, học viên có thể bắt đầu làm bài kiểm tra.
+            </div>
             {latestAttempt && (
-              <div className={`pill ${latestAttempt.passed ? "pill-success" : "pill-danger"}`}>
+              <div className={`status-pill ${latestAttempt.passed ? "done" : "locked"}`} style={{ marginTop: 10 }}>
                 Lần gần nhất: {latestAttempt.scorePercent}% {latestAttempt.passed ? "• Đạt" : "• Chưa đạt"}
               </div>
             )}
@@ -100,25 +113,18 @@ export default function LessonQuizCard({
         <>
           <div className="quiz-topbar">
             <div>
-              <div className="section-title">Bài kiểm tra cuối bài</div>
-              <p className="section-subtitle">
+              <div className="quiz-card-title">Bài kiểm tra cuối bài</div>
+              <div className="quiz-card-subtitle">
                 Đạt từ {passScore}% để mở khóa bài học tiếp theo.
-              </p>
+              </div>
             </div>
-
-            <div className="pill pill-primary">
-              <Clock3 size={14} />
-              {formatSeconds(quizTimeLeft)}
-            </div>
+            <div className="pill pill-primary">{formatSeconds(quizTimeLeft)}</div>
           </div>
 
           <div className="quiz-question-list">
-            {questions.map((question, index) => (
+            {lessonQuestions.map((question, index) => (
               <div key={question.id} className="quiz-question-card">
-                <div className="quiz-question-title">
-                  {index + 1}. {question.question}
-                </div>
-
+                <div className="quiz-question-title">{index + 1}. {question.question}</div>
                 <div className="quiz-options">
                   {question.options.map((option, optionIndex) => {
                     const selected = quizAnswers[index] === optionIndex;
@@ -127,16 +133,12 @@ export default function LessonQuizCard({
                     return (
                       <button
                         key={option}
+                        type="button"
                         className={`quiz-option ${selected ? "selected" : ""}`}
+                        onClick={() => setQuizAnswers((prev) => ({ ...prev, [index]: optionIndex }))}
                         disabled={locked}
-                        onClick={() =>
-                          setQuizAnswers((prev) => ({
-                            ...prev,
-                            [index]: optionIndex,
-                          }))
-                        }
                       >
-                        {option}
+                        <span className="quiz-option-text">{option}</span>
                       </button>
                     );
                   })}
@@ -146,39 +148,16 @@ export default function LessonQuizCard({
           </div>
 
           <div className="quiz-actions">
-            <button className="btn btn-primary" onClick={() => void handleSubmit()} disabled={submitting}>
+            <button className="btn btn-primary" onClick={() => void handleSubmitQuiz()} disabled={submitting}>
               {submitting ? "Đang nộp..." : "Nộp bài kiểm tra"}
             </button>
-
-            <button
-              className="btn btn-secondary"
-              onClick={() => {
-                setQuizAnswers({});
-                setQuizTimeLeft(getLessonDurationSeconds(lessonDetail));
-              }}
-              disabled={submitting}
-            >
+            <button className="btn btn-secondary" onClick={handleRetryQuiz} disabled={submitting}>
               Làm lại
             </button>
-
             <button className="btn btn-secondary" onClick={() => setQuizVisible(false)} disabled={submitting}>
               Ẩn bài kiểm tra
             </button>
           </div>
-
-          {latestAttempt && (
-            <div className={`attempt-box ${latestAttempt.passed ? "success" : "danger"}`}>
-              <div className="pill-row">
-                <span className={`pill ${latestAttempt.passed ? "pill-success" : "pill-danger"}`}>
-                  {latestAttempt.passed ? "Pass" : "Chưa đạt"}
-                </span>
-                <span className="pill">
-                  {latestAttempt.correctCount}/{latestAttempt.totalQuestions} câu đúng
-                </span>
-                <span className="pill">Điểm {latestAttempt.scorePercent}%</span>
-              </div>
-            </div>
-          )}
         </>
       )}
     </section>

@@ -1,12 +1,11 @@
 import React from "react";
-import { RefreshCw } from "lucide-react";
 import { Progress } from "../../components/ui/Progress";
-import { getStatusLabel } from "../../features/training/helpers";
-import { OverviewCourse } from "../../features/training/types";
+import { getStatusLabel, DEMO_USER_ID } from "../../features/training/helpers";
+import type { OverviewCourse } from "../../features/training/types";
 
 type Props = {
   course: OverviewCourse | null;
-  enrollment: any;
+  enrollment: { status?: string; progressPercent?: number } | null;
   completionPercent: number;
   completedLessons: number;
   onReload: () => void;
@@ -32,7 +31,6 @@ export default function HeaderOverviewCard({
 
           <div className="action-row">
             <button className="btn btn-secondary" onClick={onReload}>
-              <RefreshCw size={16} />
               Tải lại dữ liệu
             </button>
 
@@ -42,7 +40,7 @@ export default function HeaderOverviewCard({
 
             {enrollment && (
               <span className="pill">
-                demo_user_001 • {getStatusLabel(enrollment.status)} • {enrollment.progressPercent}%
+                {DEMO_USER_ID} • {getStatusLabel(enrollment.status)} • {enrollment.progressPercent ?? 0}%
               </span>
             )}
           </div>
@@ -57,9 +55,7 @@ export default function HeaderOverviewCard({
 
             <div className="kpi-card">
               <div className="kpi-label">Hoàn thành</div>
-              <div className="kpi-value">
-                {completedLessons}/{course?.lessonCount ?? 0}
-              </div>
+              <div className="kpi-value">{completedLessons}/{course?.lessonCount ?? 0}</div>
             </div>
 
             <div className="kpi-card">

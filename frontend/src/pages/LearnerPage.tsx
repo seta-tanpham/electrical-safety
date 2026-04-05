@@ -7,22 +7,13 @@ import LessonQuizCard from "../components/learner/LessonQuizCard";
 import LessonReaderPanel from "../components/learner/LessonReaderPanel";
 import LessonWorkspaceCard from "../components/learner/LessonWorkspaceCard";
 import {
-  buildEnrichedModules,
   buildProgressFallback,
+  COURSE_ID,
+  DEMO_USER_ID,
+  getLessonDurationSeconds,
+  PASS_SCORE,
 } from "../features/training/helpers";
-import {
-  EnrichedModule,
-  LessonAttempt,
-  LessonDetail,
-  LessonSummary,
-  Module,
-  OverviewCourse,
-  ProgressLesson,
-} from "../features/training/types";
-
-const COURSE_ID = "electrical-safety-foundation";
-const DEMO_USER_ID = "demo_user_001";
-const PASS_SCORE = 75;
+import type { LessonAttempt, LessonDetail, LessonSummary, Module, OverviewCourse, ProgressLesson } from "../features/training/types";
 
 export default function LearnerPage() {
   const [course, setCourse] = useState<OverviewCourse | null>(null);
@@ -31,7 +22,7 @@ export default function LearnerPage() {
   const [progressLessons, setProgressLessons] = useState<ProgressLesson[]>([]);
   const [currentLessonId, setCurrentLessonId] = useState<string | null>(null);
   const [lessonDetail, setLessonDetail] = useState<LessonDetail | null>(null);
-  const [enrollment, setEnrollment] = useState<any>(null);
+  const [enrollment, setEnrollment] = useState<{ status?: string; progressPercent?: number } | null>(null);
   const [latestAttempt, setLatestAttempt] = useState<LessonAttempt | null>(null);
   const [quizVisible, setQuizVisible] = useState(false);
   const [quizAnswers, setQuizAnswers] = useState<Record<number, number>>({});
@@ -42,9 +33,17 @@ export default function LearnerPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
-  const visibleModules = useMemo<EnrichedModule[]>(() => {
-    return buildEnrichedModules(modules, lessons, progressLessons);
-  }, [modules, lessons, progressLessons]);
+  const completionPercent = useMemo(() => {
+    if (!course?.lessonCount) return 0;
+    return Math.round(
+      (progressLessons.filter((item) => item.status === "completed").length / course.lessonCount) * 100
+    );
+  }, [course, progressLessons]);
+
+  const completedLessonsCount = useMemo(
+    () => progressLessons.filter((item) => item.status === "completed").length,
+    [progressLessons]
+  );
 
   const loadBaseData = useCallback(async () => {
     setLoading(true);
@@ -81,8 +80,8 @@ export default function LearnerPage() {
       if (firstUnlockedLesson) {
         setCurrentLessonId((prev) => prev ?? firstUnlockedLesson.lessonId);
       }
-    } catch (err: any) {
-      setError(err?.message || "Không tải được dữ liệu.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Không tải được dữ liệu.");
     } finally {
       setLoading(false);
     }
@@ -102,10 +101,10 @@ export default function LearnerPage() {
       setLatestAttempt(latestAttemptPayload?.data?.latestQuizAttempt ?? null);
       setQuizVisible(false);
       setQuizAnswers({});
+      setQuizTimeLeft(getLessonDurationSeconds(detailPayload.data));
       setSelectedSectionIndex(0);
-      setCurrentLessonId(lessonId);
-    } catch (err: any) {
-      setError(err?.message || "Không tải được bài học.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Không tải được bài học.");
     } finally {
       setLoadingLesson(false);
     }
@@ -116,21 +115,18 @@ export default function LearnerPage() {
   }, [loadBaseData]);
 
   useEffect(() => {
-    if (currentLessonId) {
-      void loadLesson(currentLessonId);
-    }
+    if (!currentLessonId) return;
+    void loadLesson(currentLessonId);
   }, [currentLessonId, loadLesson]);
 
-  const completionPercent = useMemo(() => {
-    if (!course?.lessonCount) return 0;
-    return Math.round(
-      (progressLessons.filter((x) => x.status === "completed").length / course.lessonCount) * 100
-    );
-  }, [course, progressLessons]);
-
-  const completedLessons = useMemo(() => {
-    return progressLessons.filter((x) => x.status === "completed").length;
-  }, [progressLessons]);
+  async function handleEnroll() {
+    try {
+      await api.enroll(COURSE_ID, DEMO_USER_ID);
+      await loadBaseData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Không thể ghi danh.");
+    }
+  }
 
   if (loading) {
     return <div className="page-shell">Đang tải dữ liệu...</div>;
@@ -142,19 +138,18 @@ export default function LearnerPage() {
         course={course}
         enrollment={enrollment}
         completionPercent={completionPercent}
-        completedLessons={completedLessons}
+        completedLessons={completedLessonsCount}
         onReload={() => void loadBaseData()}
-        onEnroll={async () => {
-          await api.enroll(COURSE_ID, DEMO_USER_ID);
-          await loadBaseData();
-        }}
+        onEnroll={() => void handleEnroll()}
       />
 
       {error && <div className="error-box">{error}</div>}
 
       <div className="learner-layout">
         <LearningSidebarCard
-          modules={visibleModules}
+          modules={modules}
+          lessons={lessons}
+          progressLessons={progressLessons}
           currentLessonId={currentLessonId}
           onSelectLesson={setCurrentLessonId}
         />
@@ -165,7 +160,6 @@ export default function LearnerPage() {
             lessons={lessons}
             currentLessonId={currentLessonId}
             passScore={PASS_SCORE}
-            completionPercent={completionPercent}
             loading={loadingLesson}
           />
 
@@ -193,27 +187,9 @@ export default function LearnerPage() {
             submitting={submitting}
             setSubmitting={setSubmitting}
             passScore={PASS_SCORE}
-            onSubmit={async (payload, durationSeconds) => {
-              const response = await api.submitLessonQuiz(
-                COURSE_ID,
-                lessonDetail!.id,
-                DEMO_USER_ID,
-                durationSeconds,
-                payload
-              );
-
-              const attempt =
-                response?.data?.attempt ??
-                response?.data?.latestQuizAttempt ??
-                response?.data ??
-                null;
-
-              setLatestAttempt(attempt);
-              setEnrollment(response?.data?.enrollment ?? enrollment);
+            onSubmitted={async () => {
               await loadBaseData();
-              if (currentLessonId) {
-                await loadLesson(currentLessonId);
-              }
+              if (currentLessonId) await loadLesson(currentLessonId);
             }}
           />
         </div>

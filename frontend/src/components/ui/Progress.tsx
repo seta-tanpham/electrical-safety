@@ -1,14 +1,10 @@
 import React from "react";
 
-interface ProgressProps {
-  value: number;
-}
-
-export function Progress({ value }: ProgressProps) {
-  const clamped = Math.min(100, Math.max(0, value));
+export function Progress({ value, className = "" }: { value: number; className?: string }) {
+  const safeValue = Math.max(0, Math.min(100, value));
   return (
-    <div className="progress-bar-track">
-      <div className="progress-bar-fill" style={{ width: `${clamped}%` }} />
+    <div className={`progress-track ${className}`.trim()}>
+      <div className="progress-fill" style={{ width: `${safeValue}%` }} />
     </div>
   );
 }

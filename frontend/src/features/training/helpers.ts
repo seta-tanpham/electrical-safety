@@ -1,13 +1,14 @@
-import {
-  EnrichedLesson,
-  EnrichedModule,
+import type {
   LessonDetail,
-  LessonQuestion,
   LessonSection,
   LessonSummary,
   Module,
   ProgressLesson,
 } from "./types";
+
+export const COURSE_ID = "electrical-safety-foundation";
+export const DEMO_USER_ID = "demo_user_001";
+export const PASS_SCORE = 75;
 
 export const LESSON_QUIZ_OPTIONS = [
   "Tuân thủ đúng quy trình an toàn và thực hiện theo hướng dẫn chuẩn.",
@@ -53,7 +54,7 @@ export function getLessonDurationSeconds(lesson?: LessonDetail | null) {
   return Math.max(90, questionCount * 45);
 }
 
-export function buildLessonQuestions(lesson?: LessonDetail | null): LessonQuestion[] {
+export function buildLessonQuestions(lesson?: LessonDetail | null) {
   return (lesson?.quizPrompts ?? []).map((prompt, index) => ({
     id: `${lesson?.id}-quiz-${index + 1}`,
     question: prompt,
@@ -128,44 +129,6 @@ export function buildDetailedSections(lesson?: LessonDetail | null): LessonSecti
       warning:
         "Sai lầm thường gặp là hiểu khái niệm đúng nhưng không chuyển nó thành hành vi an toàn cụ thể tại hiện trường.",
       relatedChecklist: fallbackChecklist,
-    };
-  });
-}
-
-export function buildEnrichedModules(
-  modules: Module[],
-  lessons: LessonSummary[],
-  progressLessons: ProgressLesson[]
-): EnrichedModule[] {
-  const lessonMap = new Map<string, EnrichedLesson[]>();
-
-  for (const lesson of lessons) {
-    const progress = progressLessons.find((item) => item.lessonId === lesson.id);
-    const entry: EnrichedLesson = {
-      ...lesson,
-      unlocked: progress?.unlocked ?? false,
-      completed: progress?.status === "completed",
-      passed: progress?.passed ?? false,
-    };
-
-    if (!lessonMap.has(lesson.moduleId)) lessonMap.set(lesson.moduleId, []);
-    lessonMap.get(lesson.moduleId)!.push(entry);
-  }
-
-  for (const [key, value] of lessonMap.entries()) {
-    lessonMap.set(key, [...value].sort((a, b) => a.orderIndex - b.orderIndex));
-  }
-
-  return modules.map((module) => {
-    const moduleLessons = lessonMap.get(module.id) ?? [];
-    const unlocked = moduleLessons.some((lesson) => lesson.unlocked) || moduleLessons.length === 0;
-    const completed = moduleLessons.length > 0 && moduleLessons.every((lesson) => lesson.completed);
-
-    return {
-      ...module,
-      lessons: moduleLessons,
-      unlocked,
-      completed,
     };
   });
 }
