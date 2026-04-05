@@ -1376,3 +1376,135 @@ button {
     grid-template-columns: 1fr;
   }
 }
+
+
+/* ===== v8: API quiz + compact header + stable meta ===== */
+.header-card-flat {
+  padding: 18px 20px 20px;
+}
+
+.header-top-flat {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.header-intro-copy-flat {
+  max-width: 52ch;
+  font-size: 13px;
+  line-height: 1.6;
+  text-align: right;
+}
+
+.header-kpi-grid-flat {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  align-items: stretch;
+}
+
+.flat-card {
+  min-height: 110px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.header-summary-grid-flat {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin-top: 12px;
+  gap: 12px;
+}
+
+.flat-summary-card {
+  min-height: 84px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.kpi-value,
+.summary-value,
+.workspace-strip-value,
+.stat-value {
+  font-variant-numeric: tabular-nums;
+}
+
+.workspace-meta-grid {
+  grid-template-columns: repeat(2, minmax(180px, 200px));
+  min-width: 396px;
+  align-items: stretch;
+}
+
+.workspace-meta-card {
+  min-height: 92px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.workspace-meta-card .summary-label {
+  min-height: 18px;
+}
+
+.quiz-option.correct {
+  background: #ffffff;
+  border-color: #d9e2ef;
+}
+
+.quiz-option.correct .quiz-option-text {
+  color: var(--text);
+}
+
+.quiz-option.correct.selected {
+  background: #dcfce7;
+  border-color: #4ade80;
+}
+
+.quiz-option.correct.selected .quiz-option-text {
+  color: #166534;
+}
+
+.quiz-option.wrong {
+  background: #fff1f2;
+  border-color: #fca5a5;
+}
+
+.quiz-option.wrong .quiz-option-text,
+.quiz-option.wrong.selected .quiz-option-text {
+  color: #991b1b;
+}
+
+@media (max-width: 1320px) {
+  .header-top-flat {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .header-intro-copy-flat {
+    text-align: left;
+    max-width: none;
+  }
+}
+
+@media (max-width: 1200px) {
+  .header-kpi-grid-flat,
+  .header-summary-grid-flat {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 960px) {
+  .workspace-meta-grid {
+    grid-template-columns: 1fr;
+    min-width: 100%;
+  }
+}
+
+@media (max-width: 720px) {
+  .header-kpi-grid-flat,
+  .header-summary-grid-flat {
+    grid-template-columns: 1fr;
+  }
+}

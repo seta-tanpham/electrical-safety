@@ -44,6 +44,7 @@ export default function LessonQuizCard({
   const lessonQuestions = useMemo(() => buildLessonQuestions(lessonDetail), [lessonDetail]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const hasSubmittedAttempt = Boolean(latestAttempt?.submittedAt || latestAttempt?.results?.length);
+  const reviewMode = hasSubmittedAttempt;
 
   useEffect(() => {
     setCurrentQuestionIndex(0);
@@ -72,7 +73,7 @@ export default function LessonQuizCard({
       questionId: question.id,
       selectedOptionIndex: Number.isInteger(quizAnswers[index]) ? quizAnswers[index] : -1,
     }));
-    const durationSeconds = getLessonDurationSeconds(lessonDetail.quizPrompts) - quizTimeLeft;
+    const durationSeconds = getLessonDurationSeconds(lessonDetail.quizPrompts, lessonDetail.quizQuestions) - quizTimeLeft;
     await onSubmit(durationSeconds, answers);
   }
 
@@ -93,10 +94,8 @@ export default function LessonQuizCard({
       return isSelected ? "selected" : "";
     }
 
-    const correctIndex = currentQuestionResult?.correctAnswerIndex ?? 0;
-    if (optionIndex === correctIndex && isSelected) return "correct selected";
-    if (optionIndex === correctIndex) return "correct";
-    if (isSelected && optionIndex !== correctIndex) return "wrong selected";
+    if (currentQuestionResult?.isCorrect && isSelected) return "correct selected";
+    if (!currentQuestionResult?.isCorrect && isSelected) return "wrong selected";
     return isSelected ? "selected" : "";
   }
 
@@ -125,11 +124,11 @@ export default function LessonQuizCard({
 
           <button
             className="btn btn-primary"
-            disabled={!canStartQuiz}
+            disabled={!canStartQuiz && !hasSubmittedAttempt}
             onClick={() => {
               setQuizVisible(true);
               if (!hasSubmittedAttempt) {
-                setQuizTimeLeft(getLessonDurationSeconds(lessonDetail.quizPrompts));
+                setQuizTimeLeft(getLessonDurationSeconds(lessonDetail.quizPrompts, lessonDetail.quizQuestions));
               }
             }}
           >
@@ -226,14 +225,14 @@ export default function LessonQuizCard({
                             disabled={locked}
                           >
                             <span className="quiz-option-text">{option}</span>
-                            {hasSubmittedAttempt && stateClass.includes("correct") && (
+                            {reviewMode && stateClass.includes("correct") && (
                               <span className="quiz-option-indicator correct">
-                                <CheckCircle2 size={16} /> Đáp án đúng
+                                <CheckCircle2 size={16} /> Bạn đã chọn phương án này
                               </span>
                             )}
-                            {hasSubmittedAttempt && stateClass.includes("wrong") && (
+                            {reviewMode && stateClass.includes("wrong") && (
                               <span className="quiz-option-indicator wrong">
-                                <XCircle size={16} /> Bạn đã chọn đáp án này
+                                <XCircle size={16} /> Bạn đã chọn phương án này
                               </span>
                             )}
                           </button>
@@ -241,11 +240,11 @@ export default function LessonQuizCard({
                       })}
                     </div>
 
-                    {hasSubmittedAttempt && currentQuestionResult && (
+                    {reviewMode && currentQuestionResult && (
                       <div className={`quiz-review-note ${currentQuestionResult.isCorrect ? "success" : "danger"}`}>
                         {currentQuestionResult.isCorrect
                           ? "Bạn đã trả lời đúng câu này."
-                          : `Đáp án đúng là lựa chọn ${currentQuestionResult.correctAnswerIndex + 1}.`}
+                          : "Câu trả lời của bạn chưa chính xác. Hãy xem lại nội dung bài học trước khi thử lại."}
                       </div>
                     )}
                   </div>
@@ -274,7 +273,15 @@ export default function LessonQuizCard({
                       </button>
                     ) : null}
 
-                    <button className="btn btn-secondary" disabled={submitting} onClick={onRetry}>
+                    <button
+                      className="btn btn-secondary"
+                      disabled={submitting}
+                      onClick={() => {
+                        onRetry();
+                        setQuizVisible(true);
+                        setCurrentQuestionIndex(0);
+                      }}
+                    >
                       Làm lại
                     </button>
 

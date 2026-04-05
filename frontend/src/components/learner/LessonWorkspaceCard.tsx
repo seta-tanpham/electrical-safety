@@ -66,12 +66,12 @@ export default function LessonWorkspaceCard({
           </div>
 
           <div className="workspace-meta-grid">
-            <div className="summary-card compact-summary">
+            <div className="summary-card compact-summary workspace-meta-card">
               <div className="summary-label">Yêu cầu pass</div>
               <div className="summary-value">{passScore}%</div>
             </div>
 
-            <div className="summary-card compact-summary">
+            <div className="summary-card compact-summary workspace-meta-card">
               <div className="summary-label">Tiến độ khóa học</div>
               <div className="summary-value">{completionPercent}%</div>
             </div>

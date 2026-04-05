@@ -8,6 +8,7 @@ import LessonWorkspaceCard from "../components/learner/LessonWorkspaceCard";
 import LearningResourcesPanel from "../components/learner/LearningResourcesPanel";
 import { api } from "../api/client";
 import {
+  buildLessonQuestions,
   buildModulesWithFlow,
   buildProgressFallback,
   getLessonDurationSeconds,
@@ -195,16 +196,27 @@ export default function LearnerPage() {
       const normalizedLesson = normalizeLessonDetail(detailPayload.data);
       const savedState = loadCompletionState(lessonId);
 
+      const latestAttempt = latestAttemptPayload?.data?.latestQuizAttempt ?? null;
+
       setLessonDetail(normalizedLesson);
-      setLatestAttempt(latestAttemptPayload?.data?.latestQuizAttempt ?? null);
+      setLatestAttempt(latestAttempt);
       setSelectedSectionIndex(0);
       setCompletedSectionIds(savedState.completedSectionIds);
       setCompletedResourceIds(savedState.completedResourceIds);
-      setQuizAnswers({});
       setQuizVisible(false);
-      setQuizTimeLeft(getLessonDurationSeconds(normalizedLesson.quizPrompts));
+      setQuizTimeLeft(getLessonDurationSeconds(normalizedLesson.quizPrompts, normalizedLesson.quizQuestions));
       setCurrentLessonId(lessonId);
       setActiveTab("content");
+
+      if (latestAttempt?.results?.length) {
+        const restoredAnswers: Record<number, number> = {};
+        latestAttempt.results.forEach((result: any, index: number) => {
+          restoredAnswers[index] = result.selectedOptionIndex;
+        });
+        setQuizAnswers(restoredAnswers);
+      } else {
+        setQuizAnswers({});
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Không tải được bài học.");
     } finally {
@@ -244,11 +256,12 @@ export default function LearnerPage() {
         answers
       );
 
-      const fallbackResults = answers.map((answer) => ({
+      const quizQuestions = buildLessonQuestions(lessonDetail);
+      const fallbackResults = answers.map((answer, index) => ({
         questionId: answer.questionId,
         selectedOptionIndex: answer.selectedOptionIndex,
-        correctAnswerIndex: 0,
-        isCorrect: answer.selectedOptionIndex === 0,
+        correctAnswerIndex: quizQuestions[index]?.correctAnswerIndex ?? 0,
+        isCorrect: answer.selectedOptionIndex === (quizQuestions[index]?.correctAnswerIndex ?? 0),
       }));
 
       const attempt = payload.data.attempt
@@ -272,7 +285,7 @@ export default function LearnerPage() {
     if (!lessonDetail) return;
     setLatestAttempt(null);
     setQuizAnswers({});
-    setQuizTimeLeft(getLessonDurationSeconds(lessonDetail.quizPrompts));
+    setQuizTimeLeft(getLessonDurationSeconds(lessonDetail.quizPrompts, lessonDetail.quizQuestions));
   }
 
   function markSectionComplete(sectionId: string) {

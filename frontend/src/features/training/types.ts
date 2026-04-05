@@ -64,10 +64,26 @@ export type LessonSection = {
   resources: LessonResource[];
 };
 
+export type LessonQuizOption = {
+  id: string;
+  text: string;
+};
+
+export type LessonQuizQuestion = {
+  id: string;
+  prompt: string;
+  options: LessonQuizOption[];
+  correctAnswerIndex?: number;
+  explanation?: string;
+  isRequired?: boolean;
+  orderIndex?: number;
+};
+
 export type LessonDetail = LessonSummary & {
   content?: string[];
   checklist?: string[];
   quizPrompts?: string[];
+  quizQuestions?: LessonQuizQuestion[];
   sections?: LessonSection[];
 };
 
@@ -119,6 +135,7 @@ export type AdminStats = {
 
 export type NormalizedLessonDetail = LessonSummary & {
   quizPrompts: string[];
+  quizQuestions: LessonQuizQuestion[];
   sections: LessonSection[];
   allResources: LessonResource[];
 };

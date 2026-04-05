@@ -2,6 +2,7 @@ import type {
   EnrichedLesson,
   EnrichedModule,
   LessonDetail,
+  LessonQuizQuestion,
   LessonResource,
   LessonSection,
   LessonSummary,
@@ -50,17 +51,36 @@ export function formatSeconds(seconds: number) {
   return `${minutes}:${secs}`;
 }
 
-export function getLessonDurationSeconds(quizPrompts?: string[]) {
-  const questionCount = Math.max(1, quizPrompts?.length ?? 0);
+export function getLessonDurationSeconds(quizPrompts?: string[], quizQuestions?: LessonQuizQuestion[]) {
+  const questionCount = Math.max(1, quizQuestions?.length ?? quizPrompts?.length ?? 0);
   return Math.max(90, questionCount * 45);
 }
 
-export function buildLessonQuestions(lesson?: NormalizedLessonDetail | null) {
+function buildFallbackQuizQuestions(lesson?: NormalizedLessonDetail | LessonDetail | null): LessonQuizQuestion[] {
   return (lesson?.quizPrompts ?? []).map((prompt, index) => ({
     id: `${lesson?.id}-quiz-${index + 1}`,
-    question: prompt,
-    options: LESSON_QUIZ_OPTIONS,
+    prompt,
+    options: LESSON_QUIZ_OPTIONS.map((text, optionIndex) => ({
+      id: `${lesson?.id}-quiz-${index + 1}-option-${optionIndex + 1}`,
+      text,
+    })),
     correctAnswerIndex: 0,
+    orderIndex: index + 1,
+  }));
+}
+
+export function buildLessonQuestions(lesson?: NormalizedLessonDetail | LessonDetail | null) {
+  const questions = lesson?.quizQuestions?.length
+    ? [...lesson.quizQuestions].sort((a, b) => (a.orderIndex ?? 0) - (b.orderIndex ?? 0))
+    : buildFallbackQuizQuestions(lesson);
+
+  return questions.map((question, index) => ({
+    id: question.id,
+    question: question.prompt,
+    options: question.options.map((option) => option.text),
+    correctAnswerIndex: question.correctAnswerIndex ?? 0,
+    explanation: question.explanation,
+    orderIndex: question.orderIndex ?? index + 1,
   }));
 }
 
@@ -163,6 +183,10 @@ export function normalizeLessonDetail(lesson: LessonDetail): NormalizedLessonDet
   return {
     ...lesson,
     quizPrompts: lesson.quizPrompts ?? [],
+    quizQuestions:
+      lesson.quizQuestions?.length
+        ? [...lesson.quizQuestions].sort((a, b) => (a.orderIndex ?? 0) - (b.orderIndex ?? 0))
+        : buildFallbackQuizQuestions(lesson),
     sections,
     allResources,
   };
