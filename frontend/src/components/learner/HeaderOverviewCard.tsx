@@ -1,15 +1,17 @@
 import React from "react";
-import { Progress } from "../../components/ui/Progress";
-import { getStatusLabel, DEMO_USER_ID } from "../../features/training/helpers";
+import { RefreshCw } from "lucide-react";
+import { Progress } from "../ui/Progress";
+import { getStatusLabel } from "../../features/training/helpers";
 import type { OverviewCourse } from "../../features/training/types";
 
 type Props = {
   course: OverviewCourse | null;
-  enrollment: { status?: string; progressPercent?: number } | null;
+  enrollment: any;
   completionPercent: number;
   completedLessons: number;
   onReload: () => void;
   onEnroll: () => void;
+  demoUserId: string;
 };
 
 export default function HeaderOverviewCard({
@@ -19,6 +21,7 @@ export default function HeaderOverviewCard({
   completedLessons,
   onReload,
   onEnroll,
+  demoUserId,
 }: Props) {
   return (
     <section className="section-card header-card">
@@ -31,6 +34,7 @@ export default function HeaderOverviewCard({
 
           <div className="action-row">
             <button className="btn btn-secondary" onClick={onReload}>
+              <RefreshCw size={16} />
               Tải lại dữ liệu
             </button>
 
@@ -40,7 +44,7 @@ export default function HeaderOverviewCard({
 
             {enrollment && (
               <span className="pill">
-                {DEMO_USER_ID} • {getStatusLabel(enrollment.status)} • {enrollment.progressPercent ?? 0}%
+                {demoUserId} • {getStatusLabel(enrollment.status)} • {enrollment.progressPercent}%
               </span>
             )}
           </div>
@@ -55,7 +59,9 @@ export default function HeaderOverviewCard({
 
             <div className="kpi-card">
               <div className="kpi-label">Hoàn thành</div>
-              <div className="kpi-value">{completedLessons}/{course?.lessonCount ?? 0}</div>
+              <div className="kpi-value">
+                {completedLessons}/{course?.lessonCount ?? 0}
+              </div>
             </div>
 
             <div className="kpi-card">
@@ -92,7 +98,7 @@ export default function HeaderOverviewCard({
         <div className="summary-card summary-info">
           <div className="summary-label">Hướng dẫn</div>
           <div className="summary-text">
-            Chọn từng ý chính trong mục lục để đọc nội dung chi tiết.
+            Chọn từng ý chính trong mục lục để đọc nội dung chi tiết và mở học liệu liên quan.
           </div>
         </div>
       </div>

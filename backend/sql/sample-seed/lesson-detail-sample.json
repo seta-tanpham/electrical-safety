@@ -1,0 +1,57 @@
+{
+  "id": "lesson-1",
+  "courseId": "electrical-safety-foundation",
+  "moduleId": "m1",
+  "title": "Nhận diện nguy cơ an toàn điện",
+  "objective": "Nhận biết, đánh giá và kiểm soát rủi ro điện tại hiện trường.",
+  "lessonType": "theory",
+  "isRequired": true,
+  "quizPrompts": [
+    "Trước khi thao tác với thiết bị điện, cần kiểm tra điều gì đầu tiên?",
+    "Khi nào được phép bắt đầu bài kiểm tra cuối bài?"
+  ],
+  "sections": [
+    {
+      "id": "s1",
+      "title": "Các dạng tai nạn điện",
+      "summary": "Tổng quan các tình huống phổ biến",
+      "content": [
+        "Tiếp xúc trực tiếp xảy ra khi người lao động chạm vào phần tử đang mang điện.",
+        "Tiếp xúc gián tiếp thường liên quan đến vỏ thiết bị hoặc phần kim loại bị rò điện."
+      ],
+      "checklist": [
+        "Kiểm tra tình trạng thiết bị trước khi thao tác.",
+        "Xác nhận thiết bị đã được cô lập nguồn khi cần."
+      ],
+      "warning": "Không được suy đoán thiết bị đã an toàn khi chưa kiểm tra.",
+      "examples": [
+        "Tủ điện hở nắp hoặc dây dẫn bị nứt vỏ cách điện.",
+        "Thiết bị cầm tay có vỏ kim loại bị rò điện."
+      ],
+      "isRequired": true,
+      "orderIndex": 1,
+      "resources": [
+        {
+          "id": "r1",
+          "type": "video",
+          "title": "Video minh họa tai nạn điện",
+          "description": "Video mô phỏng tình huống rủi ro thực tế",
+          "url": "https://...",
+          "isRequired": true,
+          "sectionId": "s1",
+          "orderIndex": 1
+        },
+        {
+          "id": "r2",
+          "type": "pdf",
+          "title": "SOP kiểm tra an toàn điện",
+          "description": "Quy trình chuẩn trước khi thao tác",
+          "url": "https://...",
+          "isRequired": false,
+          "sectionId": "s1",
+          "orderIndex": 2
+        }
+      ]
+    }
+  ]
+}

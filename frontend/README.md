@@ -1,25 +1,27 @@
-# Frontend refactor
+# Electrical Safety Learning Workspace
 
-Frontend này giữ kiểu giao diện theo từng khung như bản cũ, nhưng đã tách thành các component riêng:
+Frontend demo cho bài toán đào tạo an toàn điện.
 
-- HeaderOverviewCard
-- LearningSidebarCard
-- LessonWorkspaceCard
-- LessonReaderPanel
-- LessonProgressCard
-- LessonQuizCard
+## Điểm chính
+- Giữ layout theo từng khung:
+  - Header overview
+  - Sidebar lộ trình học
+  - Khung bài học
+  - Reader panel nội dung chính
+  - Resource panel học liệu
+  - Tiến độ học tập
+  - Bài kiểm tra cuối bài
+- Reader panel hỗ trợ sections + resources
+- Quiz chỉ hiện khi học viên hoàn thành nội dung và học liệu bắt buộc
 
-## Chạy local
-
+## Chạy project
 ```bash
 npm install
 npm run dev
 ```
 
-## Lưu ý
-
-- Bản này dùng trực tiếp `LearnerPage` trong `App.tsx`
-- Không còn cục "Chế độ xem"
-- Phần quy trình cứu nạn đã bỏ
-- Quiz chỉ hiện khi người học bấm bắt đầu
-- Sidebar vẫn giữ luồng mở khóa / khóa / click bài học
+## Biến môi trường
+Tạo `.env` từ `.env.example` nếu muốn đổi backend:
+```bash
+VITE_PROXY_TARGET=http://localhost:3001
+```

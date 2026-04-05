@@ -1,19 +1,57 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { api } from "../api/client";
 import HeaderOverviewCard from "../components/learner/HeaderOverviewCard";
 import LearningSidebarCard from "../components/learner/LearningSidebarCard";
 import LessonProgressCard from "../components/learner/LessonProgressCard";
 import LessonQuizCard from "../components/learner/LessonQuizCard";
 import LessonReaderPanel from "../components/learner/LessonReaderPanel";
 import LessonWorkspaceCard from "../components/learner/LessonWorkspaceCard";
+import { api } from "../api/client";
 import {
+  buildModulesWithFlow,
   buildProgressFallback,
-  COURSE_ID,
-  DEMO_USER_ID,
   getLessonDurationSeconds,
-  PASS_SCORE,
+  normalizeLessonDetail,
 } from "../features/training/helpers";
-import type { LessonAttempt, LessonDetail, LessonSummary, Module, OverviewCourse, ProgressLesson } from "../features/training/types";
+import type {
+  LessonAttempt,
+  LessonSummary,
+  Module,
+  NormalizedLessonDetail,
+  OverviewCourse,
+  ProgressLesson,
+} from "../features/training/types";
+
+const COURSE_ID = "electrical-safety-foundation";
+const DEMO_USER_ID = "demo_user_001";
+const PASS_SCORE = 75;
+
+type CompletionState = {
+  completedSectionIds: string[];
+  completedResourceIds: string[];
+};
+
+function getStorageKey(lessonId: string) {
+  return `learning_workspace_state:${DEMO_USER_ID}:${lessonId}`;
+}
+
+function loadCompletionState(lessonId: string): CompletionState {
+  if (typeof window === "undefined") {
+    return { completedSectionIds: [], completedResourceIds: [] };
+  }
+
+  try {
+    const raw = window.localStorage.getItem(getStorageKey(lessonId));
+    if (!raw) return { completedSectionIds: [], completedResourceIds: [] };
+    return JSON.parse(raw);
+  } catch {
+    return { completedSectionIds: [], completedResourceIds: [] };
+  }
+}
+
+function saveCompletionState(lessonId: string, state: CompletionState) {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(getStorageKey(lessonId), JSON.stringify(state));
+}
 
 export default function LearnerPage() {
   const [course, setCourse] = useState<OverviewCourse | null>(null);
@@ -21,29 +59,67 @@ export default function LearnerPage() {
   const [lessons, setLessons] = useState<LessonSummary[]>([]);
   const [progressLessons, setProgressLessons] = useState<ProgressLesson[]>([]);
   const [currentLessonId, setCurrentLessonId] = useState<string | null>(null);
-  const [lessonDetail, setLessonDetail] = useState<LessonDetail | null>(null);
-  const [enrollment, setEnrollment] = useState<{ status?: string; progressPercent?: number } | null>(null);
-  const [latestAttempt, setLatestAttempt] = useState<LessonAttempt | null>(null);
-  const [quizVisible, setQuizVisible] = useState(false);
-  const [quizAnswers, setQuizAnswers] = useState<Record<number, number>>({});
-  const [quizTimeLeft, setQuizTimeLeft] = useState(0);
+  const [lessonDetail, setLessonDetail] = useState<NormalizedLessonDetail | null>(null);
   const [selectedSectionIndex, setSelectedSectionIndex] = useState(0);
+  const [completedSectionIds, setCompletedSectionIds] = useState<string[]>([]);
+  const [completedResourceIds, setCompletedResourceIds] = useState<string[]>([]);
+  const [quizAnswers, setQuizAnswers] = useState<Record<number, number>>({});
+  const [quizTimeLeft, setQuizTimeLeft] = useState<number>(0);
+  const [quizVisible, setQuizVisible] = useState(false);
+  const [latestAttempt, setLatestAttempt] = useState<LessonAttempt | null>(null);
+  const [enrollment, setEnrollment] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [loadingLesson, setLoadingLesson] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
+  const visibleModules = useMemo(
+    () => buildModulesWithFlow(modules, lessons, progressLessons),
+    [modules, lessons, progressLessons]
+  );
+
   const completionPercent = useMemo(() => {
     if (!course?.lessonCount) return 0;
-    return Math.round(
-      (progressLessons.filter((item) => item.status === "completed").length / course.lessonCount) * 100
-    );
+    const completedCount = progressLessons.filter((item) => item.status === "completed").length;
+    return Math.round((completedCount / course.lessonCount) * 100);
   }, [course, progressLessons]);
+
+  const completedLessonPercent = useMemo(() => {
+    return Math.round(
+      (progressLessons.filter((item) => item.status === "completed").length /
+        Math.max(1, lessons.length)) *
+        100
+    );
+  }, [progressLessons, lessons.length]);
+
+  const openedLessonPercent = useMemo(() => {
+    return Math.round(
+      (progressLessons.filter((item) => item.unlocked).length / Math.max(1, lessons.length)) * 100
+    );
+  }, [progressLessons, lessons.length]);
+
+  const currentLessonIndex = useMemo(() => {
+    const flat = visibleModules.flatMap((module) => module.lessons);
+    const idx = flat.findIndex((lesson) => lesson.id === currentLessonId);
+    return idx >= 0 ? idx + 1 : 0;
+  }, [visibleModules, currentLessonId]);
 
   const completedLessonsCount = useMemo(
     () => progressLessons.filter((item) => item.status === "completed").length,
     [progressLessons]
   );
+
+  const canStartQuiz = useMemo(() => {
+    if (!lessonDetail) return false;
+
+    const requiredSections = lessonDetail.sections.filter((section) => section.isRequired).map((section) => section.id);
+    const requiredResources = lessonDetail.allResources.filter((resource) => resource.isRequired).map((resource) => resource.id);
+
+    const sectionsCompleted = requiredSections.every((id) => completedSectionIds.includes(id));
+    const resourcesCompleted = requiredResources.every((id) => completedResourceIds.includes(id));
+
+    return sectionsCompleted && resourcesCompleted;
+  }, [lessonDetail, completedSectionIds, completedResourceIds]);
 
   const loadBaseData = useCallback(async () => {
     setLoading(true);
@@ -72,13 +148,13 @@ export default function LearnerPage() {
       setEnrollment(progressPayload?.data?.enrollment ?? null);
       setProgressLessons(normalizedProgressLessons);
 
-      const firstUnlockedLesson =
+      const firstUnlocked =
         normalizedProgressLessons.find((lesson) => lesson.unlocked) ??
         normalizedProgressLessons[0] ??
         null;
 
-      if (firstUnlockedLesson) {
-        setCurrentLessonId((prev) => prev ?? firstUnlockedLesson.lessonId);
+      if (firstUnlocked) {
+        setCurrentLessonId((prev) => prev ?? firstUnlocked.lessonId);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Không tải được dữ liệu.");
@@ -97,12 +173,18 @@ export default function LearnerPage() {
         api.getLatestLessonQuizAttempt(COURSE_ID, lessonId, DEMO_USER_ID),
       ]);
 
-      setLessonDetail(detailPayload.data);
+      const normalizedLesson = normalizeLessonDetail(detailPayload.data);
+      const savedState = loadCompletionState(lessonId);
+
+      setLessonDetail(normalizedLesson);
       setLatestAttempt(latestAttemptPayload?.data?.latestQuizAttempt ?? null);
-      setQuizVisible(false);
-      setQuizAnswers({});
-      setQuizTimeLeft(getLessonDurationSeconds(detailPayload.data));
       setSelectedSectionIndex(0);
+      setCompletedSectionIds(savedState.completedSectionIds);
+      setCompletedResourceIds(savedState.completedResourceIds);
+      setQuizAnswers({});
+      setQuizVisible(false);
+      setQuizTimeLeft(getLessonDurationSeconds(normalizedLesson.quizPrompts));
+      setCurrentLessonId(lessonId);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Không tải được bài học.");
     } finally {
@@ -119,13 +201,61 @@ export default function LearnerPage() {
     void loadLesson(currentLessonId);
   }, [currentLessonId, loadLesson]);
 
+  useEffect(() => {
+    if (!currentLessonId) return;
+    saveCompletionState(currentLessonId, { completedSectionIds, completedResourceIds });
+  }, [currentLessonId, completedSectionIds, completedResourceIds]);
+
   async function handleEnroll() {
     try {
-      await api.enroll(COURSE_ID, DEMO_USER_ID);
+      const payload = await api.enroll(COURSE_ID, DEMO_USER_ID);
+      setEnrollment(payload.data);
       await loadBaseData();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Không thể ghi danh.");
     }
+  }
+
+  async function handleQuizSubmit(
+    durationSeconds: number,
+    answers: Array<{ questionId: string; selectedOptionIndex: number }>
+  ) {
+    if (!lessonDetail) return;
+    setSubmitting(true);
+    setError("");
+
+    try {
+      const payload = await api.submitLessonQuiz(
+        COURSE_ID,
+        lessonDetail.id,
+        DEMO_USER_ID,
+        durationSeconds,
+        answers
+      );
+
+      setLatestAttempt(payload.data.attempt ?? null);
+      setEnrollment(payload.data.enrollment);
+      await loadBaseData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Không thể nộp bài kiểm tra.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  function handleRetryQuiz() {
+    if (!lessonDetail) return;
+    setLatestAttempt(null);
+    setQuizAnswers({});
+    setQuizTimeLeft(getLessonDurationSeconds(lessonDetail.quizPrompts));
+  }
+
+  function markSectionComplete(sectionId: string) {
+    setCompletedSectionIds((prev) => Array.from(new Set([...prev, sectionId])));
+  }
+
+  function markResourceComplete(resourceId: string) {
+    setCompletedResourceIds((prev) => Array.from(new Set([...prev, resourceId])));
   }
 
   if (loading) {
@@ -141,15 +271,14 @@ export default function LearnerPage() {
         completedLessons={completedLessonsCount}
         onReload={() => void loadBaseData()}
         onEnroll={() => void handleEnroll()}
+        demoUserId={DEMO_USER_ID}
       />
 
       {error && <div className="error-box">{error}</div>}
 
       <div className="learner-layout">
         <LearningSidebarCard
-          modules={modules}
-          lessons={lessons}
-          progressLessons={progressLessons}
+          modules={visibleModules}
           currentLessonId={currentLessonId}
           onSelectLesson={setCurrentLessonId}
         />
@@ -157,9 +286,10 @@ export default function LearnerPage() {
         <div className="workspace-stack">
           <LessonWorkspaceCard
             lessonDetail={lessonDetail}
-            lessons={lessons}
-            currentLessonId={currentLessonId}
-            passScore={PASS_SCORE}
+            totalLessons={lessons.length}
+            currentLessonIndex={currentLessonIndex}
+            completionPercent={completionPercent}
+            passScore={75}
             loading={loadingLesson}
           />
 
@@ -167,12 +297,16 @@ export default function LearnerPage() {
             lessonDetail={lessonDetail}
             selectedSectionIndex={selectedSectionIndex}
             onSelectSection={setSelectedSectionIndex}
+            completedSectionIds={completedSectionIds}
+            completedResourceIds={completedResourceIds}
+            onCompleteSection={markSectionComplete}
+            onCompleteResource={markResourceComplete}
           />
 
           <LessonProgressCard
             completionPercent={completionPercent}
-            progressLessons={progressLessons}
-            totalLessons={lessons.length}
+            completedLessonPercent={completedLessonPercent}
+            openedLessonPercent={openedLessonPercent}
           />
 
           <LessonQuizCard
@@ -185,12 +319,10 @@ export default function LearnerPage() {
             quizTimeLeft={quizTimeLeft}
             setQuizTimeLeft={setQuizTimeLeft}
             submitting={submitting}
-            setSubmitting={setSubmitting}
+            canStartQuiz={canStartQuiz}
             passScore={PASS_SCORE}
-            onSubmitted={async () => {
-              await loadBaseData();
-              if (currentLessonId) await loadLesson(currentLessonId);
-            }}
+            onSubmit={handleQuizSubmit}
+            onRetry={handleRetryQuiz}
           />
         </div>
       </div>

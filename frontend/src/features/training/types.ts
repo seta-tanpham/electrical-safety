@@ -29,10 +29,46 @@ export type LessonSummary = {
   isRequired: boolean;
 };
 
-export type LessonDetail = LessonSummary & {
+export type LessonResourceType =
+  | "video"
+  | "pdf"
+  | "image"
+  | "document"
+  | "download"
+  | "external_link";
+
+export type LessonResource = {
+  id: string;
+  type: LessonResourceType;
+  title: string;
+  description?: string;
+  url?: string;
+  previewUrl?: string;
+  isRequired: boolean;
+  sectionId?: string | null;
+  orderIndex: number;
+  durationLabel?: string;
+  fileLabel?: string;
+};
+
+export type LessonSection = {
+  id: string;
+  title: string;
+  summary: string;
   content: string[];
   checklist: string[];
-  quizPrompts: string[];
+  warning?: string;
+  examples?: string[];
+  isRequired: boolean;
+  orderIndex: number;
+  resources: LessonResource[];
+};
+
+export type LessonDetail = LessonSummary & {
+  content?: string[];
+  checklist?: string[];
+  quizPrompts?: string[];
+  sections?: LessonSection[];
 };
 
 export type ProgressLesson = {
@@ -53,13 +89,6 @@ export type LessonAttempt = {
   passed: boolean;
   durationSeconds?: number;
   submittedAt?: string;
-  forcedTimeout?: boolean;
-  results?: Array<{
-    questionId: string;
-    selectedOptionIndex: number;
-    correctAnswerIndex: number;
-    isCorrect: boolean;
-  }>;
 };
 
 export type EnrichedLesson = LessonSummary & {
@@ -74,12 +103,16 @@ export type EnrichedModule = Module & {
   completed: boolean;
 };
 
-export type LessonSection = {
-  id: string;
-  navTitle: string;
-  summary: string;
-  details: string[];
-  fieldGuide: string[];
-  warning: string;
-  relatedChecklist: string[];
+export type AdminStats = {
+  totalLearners: number;
+  passedLearners: number;
+  inProgressLearners: number;
+  passRate: number;
+  averageScore: number;
+};
+
+export type NormalizedLessonDetail = LessonSummary & {
+  quizPrompts: string[];
+  sections: LessonSection[];
+  allResources: LessonResource[];
 };

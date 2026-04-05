@@ -1,0 +1,52 @@
+{
+  "lesson_detail_response": {
+    "id": "lesson-1",
+    "title": "Nhận diện nguy cơ an toàn điện",
+    "objective": "Nhận biết các dạng rủi ro điện phổ biến tại hiện trường.",
+    "lessonType": "theory",
+    "quizPrompts": [
+      "Điều nào cần làm trước khi thao tác với thiết bị điện?",
+      "Khi nào học viên được phép bắt đầu bài kiểm tra cuối bài?"
+    ],
+    "sections": [
+      {
+        "id": "section-1",
+        "title": "Các dạng tai nạn điện",
+        "summary": "Tổng quan các tình huống phổ biến",
+        "content": [
+          "Nội dung chi tiết 1",
+          "Nội dung chi tiết 2"
+        ],
+        "checklist": [
+          "Checklist 1",
+          "Checklist 2"
+        ],
+        "warning": "Cảnh báo chính",
+        "examples": [
+          "Ví dụ 1",
+          "Ví dụ 2"
+        ],
+        "isRequired": true,
+        "orderIndex": 1,
+        "resources": [
+          {
+            "id": "resource-1",
+            "type": "video",
+            "title": "Video minh họa",
+            "description": "Video demo",
+            "url": "https://...",
+            "isRequired": true,
+            "sectionId": "section-1",
+            "orderIndex": 1
+          }
+        ]
+      }
+    ]
+  },
+  "readiness_response": {
+    "lessonId": "lesson-1",
+    "requiredSectionsCompleted": true,
+    "requiredResourcesCompleted": false,
+    "canStartQuiz": false
+  }
+}

@@ -14,7 +14,6 @@ async function fetchJson(path: string, options: RequestInit = {}) {
   if (!response.ok) {
     throw new Error(payload?.error?.message || "API request failed.");
   }
-
   return payload;
 }
 
@@ -27,17 +26,18 @@ async function fetchOptionalJson(path: string) {
 }
 
 export const api = {
+  getHealth: () => fetchJson("/../health"),
   getOverview: (courseId: string) => fetchJson(`/courses/${courseId}/overview`),
   getLessons: (courseId: string) => fetchJson(`/courses/${courseId}/lessons`),
   getLesson: (courseId: string, lessonId: string) =>
     fetchJson(`/courses/${courseId}/lessons/${lessonId}?includeBlocks=true`),
+  getProgress: (courseId: string, userId: string) =>
+    fetchOptionalJson(`/courses/${courseId}/users/${userId}/progress`),
   enroll: (courseId: string, userId: string) =>
     fetchJson(`/courses/${courseId}/enrollments`, {
       method: "POST",
       body: JSON.stringify({ userId, startNow: true }),
     }),
-  getProgress: (courseId: string, userId: string) =>
-    fetchOptionalJson(`/courses/${courseId}/users/${userId}/progress`),
   getLatestLessonQuizAttempt: (courseId: string, lessonId: string, userId: string) =>
     fetchOptionalJson(`/courses/${courseId}/lessons/${lessonId}/users/${userId}/quiz-attempts/latest`),
   submitLessonQuiz: (
@@ -51,4 +51,5 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ userId, durationSeconds, answers }),
     }),
+  getAdminStats: (courseId: string) => fetchOptionalJson(`/courses/${courseId}/admin-stats`),
 };

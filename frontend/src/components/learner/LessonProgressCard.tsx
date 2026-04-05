@@ -1,57 +1,49 @@
 import React from "react";
-import { Progress } from "../../components/ui/Progress";
-import type { ProgressLesson } from "../../features/training/types";
+import { Progress } from "../ui/Progress";
 
 type Props = {
   completionPercent: number;
-  progressLessons: ProgressLesson[];
-  totalLessons: number;
+  completedLessonPercent: number;
+  openedLessonPercent: number;
 };
 
 export default function LessonProgressCard({
   completionPercent,
-  progressLessons,
-  totalLessons,
+  completedLessonPercent,
+  openedLessonPercent,
 }: Props) {
-  const completedPercent = Math.round(
-    (progressLessons.filter((item) => item.status === "completed").length / Math.max(1, totalLessons)) * 100
-  );
-  const unlockedPercent = Math.round(
-    (progressLessons.filter((item) => item.unlocked).length / Math.max(1, totalLessons)) * 100
-  );
-
   return (
     <section className="section-card">
-      <div className="section-header compact">
+      <div className="section-header">
         <div>
-          <h3 className="section-title">Tiến độ học bài</h3>
-          <p className="section-subtitle">Theo dõi tiến độ tổng thể và trạng thái mở khóa.</p>
+          <h3 className="section-title">Tiến độ học tập</h3>
+          <p className="section-subtitle">Theo dõi tiến độ khóa học và mức độ mở khóa nội dung</p>
         </div>
       </div>
 
-      <div className="progress-card-grid">
-        <div className="progress-metric">
-          <div className="progress-row">
+      <div className="progress-grid">
+        <div className="progress-card">
+          <div className="progress-label-row">
             <span>Tiến độ toàn khóa</span>
             <span>{completionPercent}%</span>
           </div>
           <Progress value={completionPercent} />
         </div>
 
-        <div className="progress-metric">
-          <div className="progress-row">
+        <div className="progress-card">
+          <div className="progress-label-row">
             <span>Bài đã hoàn thành</span>
-            <span>{completedPercent}%</span>
+            <span>{completedLessonPercent}%</span>
           </div>
-          <Progress value={completedPercent} />
+          <Progress value={completedLessonPercent} />
         </div>
 
-        <div className="progress-metric">
-          <div className="progress-row">
+        <div className="progress-card">
+          <div className="progress-label-row">
             <span>Bài đã mở khóa</span>
-            <span>{unlockedPercent}%</span>
+            <span>{openedLessonPercent}%</span>
           </div>
-          <Progress value={unlockedPercent} />
+          <Progress value={openedLessonPercent} />
         </div>
       </div>
     </section>

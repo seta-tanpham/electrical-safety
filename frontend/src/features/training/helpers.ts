@@ -1,14 +1,30 @@
 import type {
+  EnrichedLesson,
+  EnrichedModule,
   LessonDetail,
+  LessonResource,
   LessonSection,
   LessonSummary,
   Module,
+  NormalizedLessonDetail,
   ProgressLesson,
 } from "./types";
+import { buildFallbackSections } from "../../mock/lessonResourceCatalog";
 
-export const COURSE_ID = "electrical-safety-foundation";
-export const DEMO_USER_ID = "demo_user_001";
-export const PASS_SCORE = 75;
+export const STATUS_LABELS: Record<string, string> = {
+  not_started: "Chưa bắt đầu",
+  in_progress: "Đang học",
+  completed: "Hoàn thành",
+  failed: "Chưa đạt",
+};
+
+export const LESSON_TYPE_LABELS: Record<string, string> = {
+  theory: "Lý thuyết",
+  practical: "Thực hành",
+  practice: "Thực hành",
+  quiz: "Bài kiểm tra",
+  assessment: "Đánh giá",
+};
 
 export const LESSON_QUIZ_OPTIONS = [
   "Tuân thủ đúng quy trình an toàn và thực hiện theo hướng dẫn chuẩn.",
@@ -16,21 +32,6 @@ export const LESSON_QUIZ_OPTIONS = [
   "Chỉ cần quan sát bằng mắt, không cần kiểm tra lại quy trình.",
   "Ưu tiên làm nhanh trước rồi bổ sung an toàn sau.",
 ];
-
-const STATUS_LABELS: Record<string, string> = {
-  not_started: "Chưa bắt đầu",
-  in_progress: "Đang học",
-  completed: "Hoàn thành",
-  failed: "Chưa đạt",
-};
-
-const LESSON_TYPE_LABELS: Record<string, string> = {
-  theory: "Lý thuyết",
-  practical: "Thực hành",
-  practice: "Thực hành",
-  quiz: "Bài kiểm tra",
-  assessment: "Đánh giá",
-};
 
 export function getStatusLabel(status?: string | null) {
   if (!status) return "Chưa bắt đầu";
@@ -49,12 +50,12 @@ export function formatSeconds(seconds: number) {
   return `${minutes}:${secs}`;
 }
 
-export function getLessonDurationSeconds(lesson?: LessonDetail | null) {
-  const questionCount = Math.max(1, lesson?.quizPrompts.length ?? 0);
+export function getLessonDurationSeconds(quizPrompts?: string[]) {
+  const questionCount = Math.max(1, quizPrompts?.length ?? 0);
   return Math.max(90, questionCount * 45);
 }
 
-export function buildLessonQuestions(lesson?: LessonDetail | null) {
+export function buildLessonQuestions(lesson?: NormalizedLessonDetail | null) {
   return (lesson?.quizPrompts ?? []).map((prompt, index) => ({
     id: `${lesson?.id}-quiz-${index + 1}`,
     question: prompt,
@@ -102,33 +103,67 @@ export function buildProgressFallback(
     });
 }
 
-export function buildDetailedSections(lesson?: LessonDetail | null): LessonSection[] {
-  if (!lesson) return [];
+export function buildModulesWithFlow(
+  modules: Module[],
+  lessons: LessonSummary[],
+  progressLessons: ProgressLesson[]
+): EnrichedModule[] {
+  const lessonMap = new Map<string, EnrichedLesson[]>();
 
-  return (lesson.content ?? []).map((item, index) => {
-    const relatedChecklist = (lesson.checklist ?? []).slice(index, index + 2);
-    const fallbackChecklist =
-      relatedChecklist.length > 0 ? relatedChecklist : (lesson.checklist ?? []).slice(0, 2);
-
-    return {
-      id: `${lesson.id}-section-${index + 1}`,
-      navTitle: `Ý chính ${index + 1}`,
-      summary: item,
-      details: [
-        `${item} Đây là nội dung trọng tâm cần được hiểu theo nghĩa thực hành, không chỉ đọc lướt ở mức ghi nhớ.`,
-        lesson.objective
-          ? `Mục tiêu của phần này là kết nối trực tiếp với mục tiêu bài học: ${lesson.objective}`
-          : "Người học cần biến nội dung này thành hành động kiểm soát rủi ro khi làm việc với thiết bị điện.",
-        "Khi triển khai tại hiện trường, người học cần biết mình phải kiểm tra gì, xác nhận gì và dừng ở điểm nào nếu điều kiện an toàn chưa được đảm bảo.",
-      ],
-      fieldGuide: [
-        `Đối chiếu nội dung "${item}" với bối cảnh công việc thực tế trước khi thao tác.`,
-        "Xác nhận điều kiện an toàn, tình trạng thiết bị và trách nhiệm của người thực hiện.",
-        "Nếu có điểm chưa rõ, báo lại người phụ trách thay vì tự suy đoán hoặc bỏ qua bước kiểm soát.",
-      ],
-      warning:
-        "Sai lầm thường gặp là hiểu khái niệm đúng nhưng không chuyển nó thành hành vi an toàn cụ thể tại hiện trường.",
-      relatedChecklist: fallbackChecklist,
+  for (const lesson of lessons) {
+    const progress = progressLessons.find((item) => item.lessonId === lesson.id);
+    const entry: EnrichedLesson = {
+      ...lesson,
+      unlocked: progress?.unlocked ?? false,
+      completed: progress?.status === "completed",
+      passed: progress?.passed ?? false,
     };
+    if (!lessonMap.has(lesson.moduleId)) lessonMap.set(lesson.moduleId, []);
+    lessonMap.get(lesson.moduleId)!.push(entry);
+  }
+
+  for (const [key, value] of lessonMap.entries()) {
+    lessonMap.set(key, [...value].sort((a, b) => a.orderIndex - b.orderIndex));
+  }
+
+  return modules.map((module) => {
+    const moduleLessons = lessonMap.get(module.id) ?? [];
+    const unlocked = moduleLessons.some((lesson) => lesson.unlocked) || moduleLessons.length === 0;
+    const completed = moduleLessons.length > 0 && moduleLessons.every((lesson) => lesson.completed);
+    return { ...module, lessons: moduleLessons, unlocked, completed };
   });
+}
+
+function normalizeResources(resources: LessonResource[]): LessonResource[] {
+  return [...resources].sort((a, b) => a.orderIndex - b.orderIndex);
+}
+
+function normalizeSections(rawSections: LessonSection[]): LessonSection[] {
+  return [...rawSections]
+    .sort((a, b) => a.orderIndex - b.orderIndex)
+    .map((section) => ({
+      ...section,
+      content: section.content ?? [],
+      checklist: section.checklist ?? [],
+      resources: normalizeResources(section.resources ?? []),
+      examples: section.examples ?? [],
+      isRequired: section.isRequired ?? true,
+    }));
+}
+
+export function normalizeLessonDetail(lesson: LessonDetail): NormalizedLessonDetail {
+  const sections = lesson.sections?.length
+    ? normalizeSections(lesson.sections)
+    : buildFallbackSections(lesson);
+
+  const allResources = sections
+    .flatMap((section) => section.resources.map((resource) => ({ ...resource, sectionId: section.id })))
+    .sort((a, b) => a.orderIndex - b.orderIndex);
+
+  return {
+    ...lesson,
+    quizPrompts: lesson.quizPrompts ?? [],
+    sections,
+    allResources,
+  };
 }
