@@ -5,6 +5,7 @@ import LessonProgressCard from "../components/learner/LessonProgressCard";
 import LessonQuizCard from "../components/learner/LessonQuizCard";
 import LessonReaderPanel from "../components/learner/LessonReaderPanel";
 import LessonWorkspaceCard from "../components/learner/LessonWorkspaceCard";
+import LearningResourcesPanel from "../components/learner/LearningResourcesPanel";
 import { api } from "../api/client";
 import {
   buildModulesWithFlow,
@@ -29,6 +30,8 @@ type CompletionState = {
   completedSectionIds: string[];
   completedResourceIds: string[];
 };
+
+type WorkspaceTab = "content" | "resources" | "quiz";
 
 function getStorageKey(lessonId: string) {
   return `learning_workspace_state:${DEMO_USER_ID}:${lessonId}`;
@@ -72,6 +75,7 @@ export default function LearnerPage() {
   const [loadingLesson, setLoadingLesson] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [activeTab, setActiveTab] = useState<WorkspaceTab>("content");
 
   const visibleModules = useMemo(
     () => buildModulesWithFlow(modules, lessons, progressLessons),
@@ -109,17 +113,32 @@ export default function LearnerPage() {
     [progressLessons]
   );
 
+  const requiredSections = useMemo(
+    () => (lessonDetail?.sections ?? []).filter((section) => section.isRequired).map((section) => section.id),
+    [lessonDetail]
+  );
+
+  const requiredResources = useMemo(
+    () => (lessonDetail?.allResources ?? []).filter((resource) => resource.isRequired).map((resource) => resource.id),
+    [lessonDetail]
+  );
+
+  const completedRequiredSectionCount = useMemo(
+    () => requiredSections.filter((id) => completedSectionIds.includes(id)).length,
+    [requiredSections, completedSectionIds]
+  );
+
+  const completedRequiredResourceCount = useMemo(
+    () => requiredResources.filter((id) => completedResourceIds.includes(id)).length,
+    [requiredResources, completedResourceIds]
+  );
+
   const canStartQuiz = useMemo(() => {
     if (!lessonDetail) return false;
-
-    const requiredSections = lessonDetail.sections.filter((section) => section.isRequired).map((section) => section.id);
-    const requiredResources = lessonDetail.allResources.filter((resource) => resource.isRequired).map((resource) => resource.id);
-
     const sectionsCompleted = requiredSections.every((id) => completedSectionIds.includes(id));
     const resourcesCompleted = requiredResources.every((id) => completedResourceIds.includes(id));
-
     return sectionsCompleted && resourcesCompleted;
-  }, [lessonDetail, completedSectionIds, completedResourceIds]);
+  }, [lessonDetail, requiredSections, requiredResources, completedSectionIds, completedResourceIds]);
 
   const loadBaseData = useCallback(async () => {
     setLoading(true);
@@ -185,6 +204,7 @@ export default function LearnerPage() {
       setQuizVisible(false);
       setQuizTimeLeft(getLessonDurationSeconds(normalizedLesson.quizPrompts));
       setCurrentLessonId(lessonId);
+      setActiveTab("content");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Không tải được bài học.");
     } finally {
@@ -289,40 +309,57 @@ export default function LearnerPage() {
             totalLessons={lessons.length}
             currentLessonIndex={currentLessonIndex}
             completionPercent={completionPercent}
-            passScore={75}
+            passScore={PASS_SCORE}
             loading={loadingLesson}
+            activeTab={activeTab}
+            onChangeTab={setActiveTab}
+            canStartQuiz={canStartQuiz}
+            completedRequiredSectionCount={completedRequiredSectionCount}
+            totalRequiredSections={requiredSections.length}
+            completedRequiredResourceCount={completedRequiredResourceCount}
+            totalRequiredResources={requiredResources.length}
           />
 
-          <LessonReaderPanel
-            lessonDetail={lessonDetail}
-            selectedSectionIndex={selectedSectionIndex}
-            onSelectSection={setSelectedSectionIndex}
-            completedSectionIds={completedSectionIds}
-            completedResourceIds={completedResourceIds}
-            onCompleteSection={markSectionComplete}
-            onCompleteResource={markResourceComplete}
-          />
+          {activeTab === "content" && (
+            <LessonReaderPanel
+              lessonDetail={lessonDetail}
+              selectedSectionIndex={selectedSectionIndex}
+              onSelectSection={setSelectedSectionIndex}
+              completedSectionIds={completedSectionIds}
+              onCompleteSection={markSectionComplete}
+            />
+          )}
+
+          {activeTab === "resources" && (
+            <LearningResourcesPanel
+              lessonDetail={lessonDetail}
+              completedResourceIds={completedResourceIds}
+              onCompleteResource={markResourceComplete}
+            />
+          )}
+
+          {activeTab === "quiz" && (
+            <LessonQuizCard
+              lessonDetail={lessonDetail}
+              latestAttempt={latestAttempt}
+              quizVisible={quizVisible}
+              setQuizVisible={setQuizVisible}
+              quizAnswers={quizAnswers}
+              setQuizAnswers={setQuizAnswers}
+              quizTimeLeft={quizTimeLeft}
+              setQuizTimeLeft={setQuizTimeLeft}
+              submitting={submitting}
+              canStartQuiz={canStartQuiz}
+              passScore={PASS_SCORE}
+              onSubmit={handleQuizSubmit}
+              onRetry={handleRetryQuiz}
+            />
+          )}
 
           <LessonProgressCard
             completionPercent={completionPercent}
             completedLessonPercent={completedLessonPercent}
             openedLessonPercent={openedLessonPercent}
-          />
-
-          <LessonQuizCard
-            lessonDetail={lessonDetail}
-            latestAttempt={latestAttempt}
-            quizVisible={quizVisible}
-            setQuizVisible={setQuizVisible}
-            quizAnswers={quizAnswers}
-            setQuizAnswers={setQuizAnswers}
-            quizTimeLeft={quizTimeLeft}
-            setQuizTimeLeft={setQuizTimeLeft}
-            submitting={submitting}
-            canStartQuiz={canStartQuiz}
-            passScore={PASS_SCORE}
-            onSubmit={handleQuizSubmit}
-            onRetry={handleRetryQuiz}
           />
         </div>
       </div>
