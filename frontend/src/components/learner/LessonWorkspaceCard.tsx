@@ -65,7 +65,7 @@ export default function LessonWorkspaceCard({
             <p className="workspace-subtitle">{lessonDetail.objective}</p>
           </div>
 
-          <div className="workspace-meta-grid">
+          <div className="workspace-meta-grid" style={{ paddingBottom: "15px" }}>
             <div className="summary-card compact-summary workspace-meta-card">
               <div className="summary-label">Yêu cầu pass</div>
               <div className="summary-value">{passScore}%</div>
@@ -95,9 +95,9 @@ export default function LessonWorkspaceCard({
         </div>
 
         <div className={`workspace-strip-card ${canStartQuiz ? "ready" : "locked"}`}>
-          <div className="summary-label">Điều kiện làm bài kiểm tra</div>
+          <div className="summary-label">Điều kiện làm bài</div>
           <div className="workspace-strip-text">
-            {canStartQuiz ? "Đã sẵn sàng" : "Chưa hoàn thành đủ phần học bắt buộc"}
+            {canStartQuiz ? "Đã sẵn sàng" : "Chưa đủ điều kiện"}
           </div>
         </div>
       </div>

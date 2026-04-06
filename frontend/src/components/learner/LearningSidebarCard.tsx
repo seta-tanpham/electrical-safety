@@ -23,7 +23,7 @@ export default function LearningSidebarCard({
         <div>
           <h3 className="section-title">Lộ trình học</h3>
           <p className="section-subtitle">
-            Học theo lộ trình tuần tự, hoàn thành bài trước để mở khóa bài tiếp theo.
+            Hoàn thành bài hiện tại để mở khóa bài tiếp theo.
           </p>
         </div>
       </div>

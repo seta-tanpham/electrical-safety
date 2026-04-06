@@ -33,7 +33,7 @@ export default function LessonReaderPanel({
           <div className="reader-pane-header">
             <div>
               <h3 className="section-title">Mục lục bài học</h3>
-              <p className="section-subtitle">Mỗi lần chỉ tập trung một phần để học sâu hơn</p>
+              <p className="section-subtitle">Tập trung từng phần để học sâu hơn</p>
             </div>
           </div>
 

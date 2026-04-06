@@ -71,12 +71,7 @@ export default function AdminPage() {
     const keyword = search.trim().toLowerCase();
     if (!keyword) return learners;
     return learners.filter((learner) => {
-      const haystack = [
-        learner.fullName,
-        learner.userId,
-        learner.department,
-        learner.position,
-      ]
+      const haystack = [learner.fullName, learner.userId, learner.department, learner.position]
         .join(" ")
         .toLowerCase();
       return haystack.includes(keyword);
@@ -181,45 +176,43 @@ export default function AdminPage() {
       {error && <div className="error-box">{error}</div>}
 
       <div className="admin-page-stack">
-        <section className="section-card admin-hero-card">
-          <div className="admin-hero-head">
+        <section className="section-card admin-hero-card admin-hero-card-compact">
+          <div className="pill-row" style={{ marginBottom: 10 }}>
+            <span className="pill pill-primary">Bảng điều khiển quản trị</span>
+            <span className="pill">An toàn điện</span>
+          </div>
+
+          <div className="admin-hero-head admin-hero-head-compact">
             <div>
-              <div className="pill-row" style={{ marginBottom: 10 }}>
-                <span className="pill pill-primary">Bảng điều khiển quản trị</span>
-                <span className="pill">An toàn điện</span>
-              </div>
               <h2 className="admin-hero-title">{course?.title ?? "Tổng quan đào tạo"}</h2>
               <p className="admin-hero-subtitle">
                 Theo dõi tiến độ học tập, tỷ lệ hoàn thành và kết quả của từng học viên trong toàn khóa học.
               </p>
             </div>
-
-            <div className="admin-hero-meta">
-              <div className="kpi-card compact">
-                <div className="kpi-label">Module</div>
-                <div className="kpi-value">{course?.moduleCount ?? modules.length}</div>
-              </div>
-              <div className="kpi-card compact">
-                <div className="kpi-label">Bài học</div>
-                <div className="kpi-value">{course?.lessonCount ?? lessons.length}</div>
-              </div>
-            </div>
           </div>
 
-          <div className="summary-grid admin-summary-grid">
-            <div className="summary-card">
+          <div className="summary-grid admin-summary-grid admin-summary-grid-compact">
+            <div className="summary-card compact-summary-card flat-summary-card">
+              <div className="summary-label">Module</div>
+              <div className="summary-value">{course?.moduleCount ?? modules.length}</div>
+            </div>
+            <div className="summary-card compact-summary-card flat-summary-card">
+              <div className="summary-label">Bài học</div>
+              <div className="summary-value">{course?.lessonCount ?? lessons.length}</div>
+            </div>
+            <div className="summary-card compact-summary-card flat-summary-card">
               <div className="summary-label">Tổng số học viên</div>
               <div className="summary-value">{derivedAdminStats.totalLearners}</div>
             </div>
-            <div className="summary-card">
+            <div className="summary-card compact-summary-card flat-summary-card">
               <div className="summary-label">Số người đạt</div>
               <div className="summary-value">{derivedAdminStats.passedLearners}</div>
             </div>
-            <div className="summary-card">
+            <div className="summary-card compact-summary-card flat-summary-card">
               <div className="summary-label">Tỷ lệ đạt</div>
               <div className="summary-value">{derivedAdminStats.passRate}%</div>
             </div>
-            <div className="summary-card">
+            <div className="summary-card compact-summary-card flat-summary-card">
               <div className="summary-label">Điểm trung bình</div>
               <div className="summary-value">{derivedAdminStats.averageScore}%</div>
             </div>
@@ -234,7 +227,7 @@ export default function AdminPage() {
               </div>
               <div>
                 <h3 className="section-title">Thông số chung toàn khóa học</h3>
-                <p className="section-subtitle">Tập trung vào phân bố trạng thái học tập và hiệu quả theo phòng ban.</p>
+                <p className="section-subtitle">Phân bố trạng thái học tập và hiệu quả theo phòng ban.</p>
               </div>
             </div>
 
@@ -244,15 +237,17 @@ export default function AdminPage() {
                 <div className="analytics-bars">
                   {statusBreakdown.map((item) => (
                     <div key={item.key} className="analytics-row">
-                      <div className="analytics-row-meta">
-                        <span>{item.label}</span>
-                        <strong>{item.count}</strong>
-                      </div>
-                      <div className="analytics-track">
-                        <div
-                          className={`analytics-fill ${item.tone}`}
-                          style={{ width: `${Math.max(item.percent, item.count ? 8 : 0)}%` }}
-                        />
+                      <div>
+                        <div className="analytics-row-meta">
+                          <span>{item.label}</span>
+                          <strong>{item.count}</strong>
+                        </div>
+                        <div className="analytics-track">
+                          <div
+                            className={`analytics-fill ${item.tone}`}
+                            style={{ width: `${Math.max(item.percent, item.count ? 8 : 0)}%` }}
+                          />
+                        </div>
                       </div>
                       <div className="analytics-row-percent">{item.percent}%</div>
                     </div>
@@ -262,22 +257,19 @@ export default function AdminPage() {
 
               <div className="analytics-card">
                 <div className="analytics-card-title">Hiệu quả theo phòng ban</div>
-                <div className="analytics-bars department">
+                <div className="analytics-bars">
                   {departmentMetrics.map((item) => (
                     <div key={item.department} className="department-row">
                       <div className="department-row-top">
-                        <div>
-                          <div className="department-name">{item.department}</div>
-                          <div className="department-note">{item.total} học viên</div>
-                        </div>
-                        <div className="department-score">{item.passRate}% đạt</div>
+                        <div className="department-name">{item.department}</div>
+                        <div className="department-score">{item.averageScore}%</div>
                       </div>
                       <div className="analytics-track">
                         <div className="analytics-fill success" style={{ width: `${Math.max(item.passRate, item.total ? 8 : 0)}%` }} />
                       </div>
                       <div className="department-footer">
-                        <span>{item.passed}/{item.total} hoàn thành</span>
-                        <span>Điểm TB: {item.averageScore || "--"}%</span>
+                        <span>{item.passed}/{item.total} đạt</span>
+                        <span>Tỷ lệ đạt {item.passRate}%</span>
                       </div>
                     </div>
                   ))}
@@ -294,7 +286,7 @@ export default function AdminPage() {
                 </div>
                 <div>
                   <h3 className="section-title">Danh sách học viên</h3>
-                  <p className="section-subtitle">Theo dõi chi tiết từng học viên, phòng ban, tiến độ và kết quả học tập.</p>
+                  <p className="section-subtitle">Theo dõi kết quả chi tiết của từng học viên trong khóa học.</p>
                 </div>
               </div>
 
@@ -303,7 +295,7 @@ export default function AdminPage() {
                 <input
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
-                  placeholder="Tìm theo tên, ID, phòng ban..."
+                  placeholder="Tìm theo tên, mã, phòng ban..."
                 />
               </label>
             </div>
@@ -313,24 +305,22 @@ export default function AdminPage() {
                 <thead>
                   <tr>
                     <th>Học viên</th>
-                    <th>Mã ID</th>
+                    <th>ID</th>
                     <th>Phòng ban</th>
                     <th>Vị trí</th>
                     <th>Tiến độ</th>
-                    <th>Điểm</th>
+                    <th>Điểm số</th>
                     <th>Trạng thái</th>
                     <th>Hoạt động gần nhất</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredLearners.map((learner) => (
-                    <tr key={learner.id}>
+                    <tr key={learner.userId}>
                       <td>
                         <div className="learner-cell-main">
-                          <div className="learner-name">{learner.fullName}</div>
-                          <div className="learner-subtext">
-                            {learner.completedLessons}/{learner.totalLessons} bài hoàn thành
-                          </div>
+                          <span className="learner-name">{learner.fullName}</span>
+                          <span className="learner-subtext">{learner.email ?? "--"}</span>
                         </div>
                       </td>
                       <td className="mono-text">{learner.userId}</td>
@@ -344,7 +334,7 @@ export default function AdminPage() {
                           </div>
                         </div>
                       </td>
-                      <td>{typeof learner.scorePercent === "number" ? `${learner.scorePercent}%` : "--"}</td>
+                      <td className="mono-text">{typeof learner.scorePercent === "number" ? `${learner.scorePercent}%` : "--"}</td>
                       <td>
                         <span className={`status-chip ${STATUS_CLASSNAMES[learner.status]}`}>
                           {STATUS_LABELS[learner.status]}
