@@ -52,4 +52,5 @@ export const api = {
       body: JSON.stringify({ userId, durationSeconds, answers }),
     }),
   getAdminStats: (courseId: string) => fetchOptionalJson(`/courses/${courseId}/admin-stats`),
+  getAdminLearners: (courseId: string) => fetchOptionalJson(`/courses/${courseId}/admin-learners`),
 };

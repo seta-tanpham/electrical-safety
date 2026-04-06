@@ -133,6 +133,20 @@ export type AdminStats = {
   averageScore: number;
 };
 
+export type AdminLearner = {
+  id: string;
+  userId: string;
+  fullName: string;
+  department: string;
+  position: string;
+  progressPercent: number;
+  scorePercent: number | null;
+  completedLessons: number;
+  totalLessons: number;
+  status: "not_started" | "in_progress" | "completed" | "failed";
+  lastActivityAt?: string;
+};
+
 export type NormalizedLessonDetail = LessonSummary & {
   quizPrompts: string[];
   quizQuestions: LessonQuizQuestion[];
