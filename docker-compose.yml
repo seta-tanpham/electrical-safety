@@ -1,0 +1,44 @@
+services:
+  postgres:
+    image: postgres:13
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 2s
+      timeout: 30s
+      retries: 10
+    environment:
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: electrical_safety
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  backend:
+    build:
+      context: ./backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PORT: 3001
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/electrical_safety
+      PG_POOL_MAX: 10
+    ports:
+      - "3001:3001"
+
+  frontend:
+    build:
+      context: ./frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    environment:
+      VITE_API_BASE_URL: http://localhost:3001/api
+    ports:
+      - "5173:5173"
+
+volumes:
+  postgres_data:
